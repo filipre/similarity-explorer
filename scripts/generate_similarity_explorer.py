@@ -1070,9 +1070,17 @@ HTML_TEMPLATE = """<!doctype html>
     fullscreenBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
     iconExpand.hidden = active;
     iconCompress.hidden = !active;
-    resize();
-    fitToView();
-    draw();
+    // Entering/exiting fullscreen triggers a CSS-driven layout change (.stage
+    // growing to fill the screen) that isn't necessarily done yet when this
+    // event fires. Measuring stage size too early re-centers against the old,
+    // smaller box. Wait a couple of frames so layout has actually settled.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        resize();
+        fitToView();
+        draw();
+      });
+    });
   }
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
