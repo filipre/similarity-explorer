@@ -36,7 +36,7 @@ def load_embeddings(df: pd.DataFrame) -> np.ndarray:
     model = SentenceTransformer(MODEL_NAME, device=device)
 
     embeddings = model.encode(
-        df["nuance_translation"].tolist(),
+        df["nuance_translation"].fillna("").tolist(),
         batch_size=64,
         normalize_embeddings=True,
         show_progress_bar=True,

@@ -9,9 +9,9 @@ from urllib.parse import unquote, urlparse
 import requests
 
 BASE_URL = "https://bunpro.jp"
-URLS_FILE = Path("data/urls_n4.txt")
+URLS_FILE = Path("data/urls_n1.txt")
 OUTPUT_DIR = Path("data/vocab_json")
-SLEEP_SECONDS = 1
+SLEEP_SECONDS = 0.5
 NEXT_DATA_RE = re.compile(
     r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S
 )

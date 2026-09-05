@@ -56,6 +56,7 @@ def build_nodes(vocab: pd.DataFrame) -> list[dict]:
             {
                 "id": int(row.id),
                 "title": row.title,
+                "kana": row.kana,
                 "meaning": row.meaning,
                 "nuance": row.nuance_translation,
                 "jlpt": row.jlpt_level,
@@ -404,6 +405,7 @@ HTML_TEMPLATE = """<!doctype html>
     z-index: 5;
   }
   .tooltip .t-title { font-size: 15px; font-weight: 700; }
+  .tooltip .t-kana { font-size: 11.5px; font-weight: 400; color: var(--ink-muted); }
   .tooltip .t-meaning { color: var(--ink-secondary); margin-top: 2px; }
   .tooltip .t-nuance { color: var(--ink-secondary); margin-top: 6px; font-size: 11.5px; }
   .tooltip .t-accepted { color: var(--ink-secondary); margin-top: 6px; font-size: 11px; }
@@ -413,6 +415,31 @@ HTML_TEMPLATE = """<!doctype html>
   .tooltip .t-neighbor .n-word { font-weight: 500; }
   .tooltip .t-neighbor .n-score { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; color: var(--accent); }
   .tooltip .t-neighbor.below { opacity: 0.45; }
+
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    backdrop-filter: blur(2px);
+    color: var(--ink-secondary);
+    font-size: 12.5px;
+    z-index: 4;
+  }
+  .loading-overlay[hidden] { display: none; }
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--hairline);
+    border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+    flex: 0 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .empty-state {
     position: absolute;
@@ -494,9 +521,11 @@ HTML_TEMPLATE = """<!doctype html>
         <div class="select-wrap">
           <label for="level">Level</label>
           <select id="level">
-            <option value="all" selected>All levels</option>
-            <option value="N4">N4</option>
-            <option value="N5">N5</option>
+            <option value="1">N5 only</option>
+            <option value="2">N5&ndash;N4</option>
+            <option value="3">N5&ndash;N3</option>
+            <option value="4">N5&ndash;N2</option>
+            <option value="5" selected>N5&ndash;N1 (all)</option>
           </select>
         </div>
         <div class="threshold-wrap">
@@ -539,6 +568,7 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="zoom-hint">Scroll or pinch to zoom &middot; drag to pan</div>
       <div class="tooltip" id="tooltip" hidden></div>
       <div class="empty-state" id="emptyState" hidden></div>
+      <div class="loading-overlay" id="loadingOverlay" hidden><span class="spinner"></span>Laying out graph&hellip;</div>
     </div>
 
     <div class="list-wrap" id="listWrap" hidden>
@@ -584,39 +614,58 @@ HTML_TEMPLATE = """<!doctype html>
   var visibleEdges = [];
   var visibleDegree = new Map();
   var visibleAdjacency = new Map();
-  var simulation = null;
   var lastMetric = null;
 
-  // ---- rebuild everything (nodes, edges, layout) on metric or level change;
-  // the threshold slider then only toggles what is drawn, without resimulating ----
-  function rebuild() {
-    var metric = metricSelect.value;
-    var level = levelSelect.value;
-    var cfg = raw.metrics[metric];
+  // Levels are cumulative from easiest to hardest: picking N3 means "N3 and
+  // everything easier" (N5, N4, N3), matching how JLPT study progresses.
+  var LEVEL_ORDER = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
-    nodes = level === 'all' ? raw.nodes.slice() : raw.nodes.filter(function (n) { return n.jlpt === level; });
-    nodes.forEach(function (n) {
-      n.x = (Math.random() - 0.5) * 1400;
-      n.y = (Math.random() - 0.5) * 1400;
+  function selectedLevels() {
+    return LEVEL_ORDER.slice(0, parseInt(levelSelect.value, 10));
+  }
+
+  function levelLabel(count) {
+    if (count <= 1) return LEVEL_ORDER[0];
+    return LEVEL_ORDER[0] + '–' + LEVEL_ORDER[count - 1];
+  }
+
+  // ---- layout computation runs in a Web Worker so the 400-tick force simulation
+  // never blocks the main thread; each (metric, level-selection) combo is cached
+  // after its first request, so revisiting one applies instantly with no overlay ----
+  var rawNodesById = new Map();
+  raw.nodes.forEach(function (n) { rawNodesById.set(n.id, n); });
+
+  var layoutCache = new Map();
+  var pendingLayouts = new Map();
+  var nextRequestId = 1;
+  var currentRequestId = 0;
+  var loadingOverlay = document.getElementById('loadingOverlay');
+
+  function buildLayoutFromResult(positions, edgeTriples) {
+    var subById = new Map();
+    var subNodes = positions.map(function (p) {
+      var n = Object.assign({}, rawNodesById.get(p[0]), { x: p[1], y: p[2] });
+      subById.set(n.id, n);
+      return n;
     });
-    nodesById = new Map();
-    nodes.forEach(function (n) { nodesById.set(n.id, n); });
-
-    edges = cfg.edges
-      .filter(function (e) { return nodesById.has(e.source) && nodesById.has(e.target); })
-      .map(function (e) { return { source: e.source, target: e.target, score: e.score }; });
-
-    adjacency = new Map();
-    nodes.forEach(function (n) { adjacency.set(n.id, []); });
-    edges.forEach(function (e) {
-      adjacency.get(e.source).push({ id: e.target, score: e.score });
-      adjacency.get(e.target).push({ id: e.source, score: e.score });
+    var subEdges = edgeTriples.map(function (e) {
+      return { source: subById.get(e[0]), target: subById.get(e[1]), score: e[2] };
     });
-    adjacency.forEach(function (list) { list.sort(function (a, b) { return b.score - a.score; }); });
+    var subAdjacency = new Map();
+    subNodes.forEach(function (n) { subAdjacency.set(n.id, []); });
+    subEdges.forEach(function (e) {
+      subAdjacency.get(e.source.id).push({ id: e.target.id, score: e.score });
+      subAdjacency.get(e.target.id).push({ id: e.source.id, score: e.score });
+    });
+    subAdjacency.forEach(function (list) { list.sort(function (a, b) { return b.score - a.score; }); });
+    return { nodes: subNodes, nodesById: subById, edges: subEdges, adjacency: subAdjacency };
+  }
 
-    if (simulation) simulation.stop();
-    simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(edges).id(function (d) { return d.id; })
+  function runSimulation(nodeIds, edgeTriples) {
+    var simNodes = nodeIds.map(function (id) { return { id: id, x: (Math.random() - 0.5) * 1400, y: (Math.random() - 0.5) * 1400 }; });
+    var simEdges = edgeTriples.map(function (e) { return { source: e[0], target: e[1], score: e[2] }; });
+    var sim = d3.forceSimulation(simNodes)
+      .force('link', d3.forceLink(simEdges).id(function (d) { return d.id; })
         .distance(function (l) { return 20 + (1 - l.score) * 200; })
         .strength(function (l) { return 0.05 + l.score * 0.4; }))
       .force('charge', d3.forceManyBody().strength(-24).distanceMax(500))
@@ -625,7 +674,112 @@ HTML_TEMPLATE = """<!doctype html>
       .force('x', d3.forceX(0).strength(0.02))
       .force('y', d3.forceY(0).strength(0.02))
       .stop();
-    for (var i = 0; i < 400; i++) simulation.tick();
+    for (var i = 0; i < 400; i++) sim.tick();
+    return {
+      positions: simNodes.map(function (n) { return [n.id, n.x, n.y]; }),
+      edges: simEdges.map(function (e) { return [e.source.id, e.target.id, e.score]; })
+    };
+  }
+
+  // Fallback for browsers without Worker/Blob support: same computation, main thread.
+  function computeLayoutSync(nodeIds, edgeTriples) {
+    var result = runSimulation(nodeIds, edgeTriples);
+    return buildLayoutFromResult(result.positions, result.edges);
+  }
+
+  var layoutWorker = null;
+  if (typeof Worker !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+    try {
+      var workerSource = [
+        "importScripts('https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js');",
+        "self.onmessage = function (ev) {",
+        "  var d = ev.data;",
+        "  var nodes = d.nodeIds.map(function (id) { return { id: id, x: (Math.random() - 0.5) * 1400, y: (Math.random() - 0.5) * 1400 }; });",
+        "  var edges = d.edges.map(function (e) { return { source: e[0], target: e[1], score: e[2] }; });",
+        "  var sim = d3.forceSimulation(nodes)",
+        "    .force('link', d3.forceLink(edges).id(function (n) { return n.id; })",
+        "      .distance(function (l) { return 20 + (1 - l.score) * 200; })",
+        "      .strength(function (l) { return 0.05 + l.score * 0.4; }))",
+        "    .force('charge', d3.forceManyBody().strength(-24).distanceMax(500))",
+        "    .force('collide', d3.forceCollide(6))",
+        "    .force('center', d3.forceCenter(0, 0))",
+        "    .force('x', d3.forceX(0).strength(0.02))",
+        "    .force('y', d3.forceY(0).strength(0.02))",
+        "    .stop();",
+        "  for (var i = 0; i < 400; i++) sim.tick();",
+        "  postMessage({",
+        "    requestId: d.requestId,",
+        "    positions: nodes.map(function (n) { return [n.id, n.x, n.y]; }),",
+        "    edges: edges.map(function (e) { return [e.source.id, e.target.id, e.score]; })",
+        "  });",
+        "};"
+      ].join('\\n');
+      var workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'application/javascript' }));
+      layoutWorker = new Worker(workerUrl);
+      layoutWorker.onmessage = function (ev) {
+        var d = ev.data;
+        var pending = pendingLayouts.get(d.requestId);
+        if (!pending) return;
+        pendingLayouts.delete(d.requestId);
+        pending.resolve(buildLayoutFromResult(d.positions, d.edges));
+      };
+      layoutWorker.onerror = function () {
+        layoutWorker = null; // fall back to synchronous computation from here on
+        pendingLayouts.forEach(function (pending) { pending.resolve(computeLayoutSync(pending.nodeIds, pending.edgeTriples)); });
+        pendingLayouts.clear();
+      };
+    } catch (err) {
+      layoutWorker = null;
+    }
+  }
+
+  function requestLayout(key, nodeIds, edgeTriples) {
+    return new Promise(function (resolve) {
+      var settle = function (layout) {
+        layoutCache.set(key, layout);
+        resolve(layout);
+      };
+      if (!layoutWorker) { settle(computeLayoutSync(nodeIds, edgeTriples)); return; }
+      var requestId = nextRequestId++;
+      pendingLayouts.set(requestId, { nodeIds: nodeIds, edgeTriples: edgeTriples, resolve: settle });
+      layoutWorker.postMessage({ requestId: requestId, nodeIds: nodeIds, edges: edgeTriples });
+    });
+  }
+
+  function rebuild() {
+    var metric = metricSelect.value;
+    var levels = selectedLevels();
+    var cfg = raw.metrics[metric];
+    var key = metric + '|' + levels.slice().sort().join(',');
+    var myRequest = ++currentRequestId;
+
+    var cached = layoutCache.get(key);
+    if (cached) {
+      loadingOverlay.hidden = true;
+      applyLayout(cached, metric, levels, cfg);
+      return;
+    }
+
+    var levelSet = new Set(levels);
+    var nodeIds = raw.nodes.filter(function (n) { return levelSet.has(n.jlpt); }).map(function (n) { return n.id; });
+    var idSet = new Set(nodeIds);
+    var edgeTriples = cfg.edges
+      .filter(function (e) { return idSet.has(e.source) && idSet.has(e.target); })
+      .map(function (e) { return [e.source, e.target, e.score]; });
+
+    loadingOverlay.hidden = false;
+    requestLayout(key, nodeIds, edgeTriples).then(function (layout) {
+      if (myRequest !== currentRequestId) return; // a newer selection superseded this request
+      loadingOverlay.hidden = true;
+      applyLayout(layout, metric, levels, cfg);
+    });
+  }
+
+  function applyLayout(layout, metric, levels, cfg) {
+    nodes = layout.nodes;
+    nodesById = layout.nodesById;
+    edges = layout.edges;
+    adjacency = layout.adjacency;
 
     SLIDER_MIN = cfg.sliderMin;
     thresholdInput.min = cfg.sliderMin;
@@ -637,8 +791,9 @@ HTML_TEMPLATE = """<!doctype html>
     thresholdValueEl.textContent = threshold.toFixed(3);
     legendMinEl.textContent = threshold.toFixed(2);
 
+    var allLevels = levels.length === LEVEL_ORDER.length;
     eyebrowEl.textContent = 'JLPT vocabulary · ' + cfg.label.toLowerCase() +
-      (level === 'all' ? '' : ' · ' + level + ' only');
+      (allLevels ? '' : ' · ' + levelLabel(levels.length));
     methodEl.innerHTML = cfg.methodHtml;
 
     hovered = null;
@@ -953,6 +1108,11 @@ HTML_TEMPLATE = """<!doctype html>
     tooltip.hidden = false;
     tooltip.innerHTML = '';
     var title = document.createElement('div'); title.className = 't-title'; title.textContent = n.title;
+    if (n.kana && n.kana !== n.title) {
+      var kana = document.createElement('span'); kana.className = 't-kana'; kana.textContent = n.kana;
+      title.appendChild(document.createTextNode(' '));
+      title.appendChild(kana);
+    }
     var meaning = document.createElement('div'); meaning.className = 't-meaning'; meaning.textContent = n.meaning;
     var nuance = document.createElement('div'); nuance.className = 't-nuance'; nuance.textContent = n.nuance;
     var accepted = document.createElement('div'); accepted.className = 't-accepted'; accepted.textContent = 'Accepted: ' + n.accepted;
@@ -962,10 +1122,10 @@ HTML_TEMPLATE = """<!doctype html>
     tooltip.appendChild(title); tooltip.appendChild(meaning); tooltip.appendChild(nuance);
     tooltip.appendChild(accepted); tooltip.appendChild(degree);
 
-    var top3 = adjacency.get(n.id).slice(0, 3);
-    if (top3.length) {
+    var top5 = adjacency.get(n.id).slice(0, 5);
+    if (top5.length) {
       var box = document.createElement('div'); box.className = 't-neighbors';
-      top3.forEach(function (nb) {
+      top5.forEach(function (nb) {
         var row = document.createElement('div');
         row.className = 't-neighbor' + (nb.score < threshold ? ' below' : '');
         var w = document.createElement('span'); w.className = 'n-word'; w.textContent = nodesById.get(nb.id).title;
@@ -1140,7 +1300,7 @@ HTML_TEMPLATE = """<!doctype html>
 
 def main() -> None:
     vocab = pd.read_csv(VOCAB_CSV)
-    text_cols = ["title", "meaning", "nuance_translation", "jlpt_level", "accepted_answers"]
+    text_cols = ["title", "kana", "meaning", "nuance_translation", "jlpt_level", "accepted_answers"]
     vocab[text_cols] = vocab[text_cols].fillna("")
 
     nuance_df = pd.read_csv(NUANCE_SIMILARITY_CSV)
