@@ -1,0 +1,600 @@
+<title>Red Pen Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F2F5F6;
+  --surface:#FFFFFF;
+  --surface-2:#EAEFF1;
+  --ink:#1C1F24;
+  --ink-soft:#4B525A;
+  --muted:#767F87;
+  --line:#DBE3E6;
+  --line-strong:#C2CDD1;
+  --accent:#C7402A;
+  --accent-ink:#8F2A1C;
+  --accent-soft:#FBEAE6;
+  --accent-contrast:#FFFFFF;
+  --amber-ink:#8A5A00;
+  --amber-soft:#FFF3D9;
+  --good-ink:#2A7350;
+  --good-soft:#E4F3EA;
+  --shadow:0 1px 2px rgba(20,24,28,.06),0 10px 28px -14px rgba(20,24,28,.22);
+  --font-display:'Newsreader',Georgia,'Noto Serif JP',serif;
+  --font-body:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-jp:'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#15171B;
+    --surface:#1C1F24;
+    --surface-2:#23272D;
+    --ink:#EDEFF2;
+    --ink-soft:#B7BEC6;
+    --muted:#868F98;
+    --line:#2B3038;
+    --line-strong:#3A414A;
+    --accent:#FF7156;
+    --accent-ink:#FF8C72;
+    --accent-soft:#3A2019;
+    --accent-contrast:#1C1F24;
+    --amber-ink:#E4B646;
+    --amber-soft:#33290F;
+    --good-ink:#63C093;
+    --good-soft:#15271E;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#15171B;
+  --surface:#1C1F24;
+  --surface-2:#23272D;
+  --ink:#EDEFF2;
+  --ink-soft:#B7BEC6;
+  --muted:#868F98;
+  --line:#2B3038;
+  --line-strong:#3A414A;
+  --accent:#FF7156;
+  --accent-ink:#FF8C72;
+  --accent-soft:#3A2019;
+  --accent-contrast:#1C1F24;
+  --amber-ink:#E4B646;
+  --amber-soft:#33290F;
+  --good-ink:#63C093;
+  --good-soft:#15271E;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 80px}
+
+/* ---------- header ---------- */
+header.top{
+  position:relative;
+  padding:52px 24px 40px;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, var(--line) 27px, var(--line) 28px),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, var(--line) 27px, var(--line) 28px);
+  background-color:var(--surface);
+  border-bottom:1px solid var(--line);
+  overflow:hidden;
+}
+header.top::after{
+  content:"";
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse 700px 320px at 12% -10%, var(--paper) 0%, transparent 70%);
+  pointer-events:none;
+}
+.top-inner{max-width:1180px;margin:0 auto;position:relative}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:12px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:14px;
+}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+h1{
+  font-family:var(--font-display);
+  font-style:italic;
+  font-weight:500;
+  font-size:clamp(34px,5vw,52px);
+  margin:0 0 12px;
+  text-wrap:balance;
+  color:var(--ink);
+}
+h1 .stamp{
+  font-style:normal;
+  color:var(--accent);
+}
+.dek{
+  font-size:16px;
+  color:var(--ink-soft);
+  max-width:62ch;
+  margin:0 0 32px;
+}
+.dek b{color:var(--ink);font-weight:600}
+
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:14px 18px;
+  min-width:150px;
+  box-shadow:var(--shadow);
+}
+.stat .n{
+  font-family:var(--font-mono);
+  font-variant-numeric:tabular-nums;
+  font-size:26px;
+  font-weight:600;
+  color:var(--ink);
+  line-height:1.1;
+}
+.stat .n.accent{color:var(--accent-ink)}
+.stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* ---------- charts section ---------- */
+.charts{
+  display:grid;
+  grid-template-columns:1.1fr 1fr 1fr;
+  gap:16px;
+  margin:32px 0 8px;
+}
+@media (max-width:860px){.charts{grid-template-columns:1fr}}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px 22px 18px;
+}
+.panel h2{
+  font-family:var(--font-body);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin:0 0 16px;
+}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:default}
+.bar-row.clickable{cursor:pointer}
+.bar-row .lbl{
+  font-size:12.5px;color:var(--ink-soft);width:118px;flex:0 0 auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.bar-track{flex:1;height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;transition:filter .15s}
+.bar-row.clickable:hover .bar-fill{filter:brightness(1.12)}
+.bar-row.active .lbl{color:var(--ink);font-weight:600}
+.bar-count{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:12.5px;color:var(--muted);width:48px;text-align:right;flex:0 0 auto;
+}
+.meaning-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+.meaning-row .jp{font-family:var(--font-jp);color:var(--ink);width:84px;flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meaning-row .bar-track{height:7px}
+.meaning-row .bar-count{width:34px}
+
+/* ---------- filters ---------- */
+.controls{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:36px 0 18px;
+  padding:14px 18px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+.search{
+  flex:1 1 240px;
+  position:relative;
+}
+.search input{
+  width:100%;
+  font-family:var(--font-body);
+  font-size:14px;
+  padding:9px 12px 9px 34px;
+  border:1px solid var(--line-strong);
+  border-radius:8px;
+  background:var(--paper);
+  color:var(--ink);
+}
+.search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5}
+.seg{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg button{
+  font-family:var(--font-body);font-size:12.5px;font-weight:500;
+  padding:6px 11px;border-radius:6px;border:none;background:transparent;color:var(--ink-soft);
+  cursor:pointer;white-space:nowrap;
+}
+.seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select#sort{
+  font-family:var(--font-body);font-size:12.5px;
+  padding:8px 10px;border-radius:8px;border:1px solid var(--line-strong);
+  background:var(--paper);color:var(--ink);
+}
+.result-count{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.result-count b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---------- cards ---------- */
+#cards{display:flex;flex-direction:column;gap:14px}
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px 22px;
+  box-shadow:var(--shadow);
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  padding:4px 10px;border-radius:100px;
+}
+.chip.tier-strong{background:var(--accent);color:var(--accent-contrast)}
+.chip.tier-listed{background:var(--accent-soft);color:var(--accent-ink)}
+.chip.tier-heuristic{background:var(--surface-2);color:var(--ink-soft)}
+.card-meta{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);display:flex;gap:14px;align-items:center}
+.card-meta span{white-space:nowrap}
+
+.jp-sentence{
+  font-family:var(--font-jp);
+  font-size:17px;
+  line-height:1.9;
+  color:var(--ink);
+  margin-bottom:16px;
+}
+.jp-sentence .blank{
+  display:inline-block;
+  min-width:2.6em;
+  border-bottom:2px solid var(--accent);
+  color:var(--accent-ink);
+  text-align:center;
+  font-weight:600;
+}
+.jp-sentence .vocab-popout{color:inherit;border-bottom:1px dotted var(--line-strong)}
+
+.compare{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.compare-side{padding:14px 16px;background:var(--surface)}
+.compare-side.accepted{background:var(--good-soft)}
+.compare-side.rejected{background:var(--accent-soft)}
+.compare-tag{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.compare-side.accepted .compare-tag{color:var(--good-ink)}
+.compare-side.rejected .compare-tag{color:var(--accent-ink)}
+.compare-word{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.compare-word .jp{font-family:var(--font-jp);font-size:19px;font-weight:600;color:var(--ink)}
+.compare-word .reading{font-family:var(--font-jp);font-size:13px;color:var(--muted)}
+.compare-alts{font-size:11.5px;color:var(--muted);margin-top:6px}
+.compare-divider{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:14px 12px;background:var(--surface-2);
+  font-size:11px;color:var(--muted);text-align:center;line-height:1.4;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);
+  min-width:96px;
+}
+.compare-divider b{font-family:var(--font-jp);font-size:13px;color:var(--ink);font-weight:600;display:block;margin-top:2px}
+@media (max-width:640px){
+  .compare{grid-template-columns:1fr}
+  .compare-divider{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);flex-direction:row;gap:6px}
+}
+
+.translation{
+  font-size:13.5px;
+  color:var(--ink-soft);
+  padding-top:12px;
+  border-top:1px dashed var(--line);
+}
+.translation strong{color:var(--accent-ink);font-weight:700}
+.wrong-note{
+  margin-top:10px;font-size:12px;color:var(--amber-ink);
+  background:var(--amber-soft);display:inline-block;padding:4px 10px;border-radius:6px;
+}
+
+.empty{
+  text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;
+}
+
+/* ---------- pagination ---------- */
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:28px}
+.pager button{
+  font-family:var(--font-body);font-size:13px;font-weight:600;
+  padding:8px 16px;border-radius:8px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);cursor:pointer;
+}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+.pager button:not(:disabled):hover{border-color:var(--accent)}
+.pager .pg{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+footer{
+  max-width:1180px;margin:48px auto 0;padding:20px 24px 0;
+  border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted);line-height:1.7;
+}
+footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="eyebrow"><span class="dot"></span>similarity&#8209;explorer &middot; answer QA</div>
+    <h1>Red Pen <span class="stamp">Review</span></h1>
+    <p class="dek">Fill&#8209;in&#8209;the&#8209;blank questions where a <b>different, equally correct</b> Japanese word shares the English cue being tested &mdash; like accepting only <span style="font-family:var(--font-jp)">&#27515;</span> and marking <span style="font-family:var(--font-jp)">&#27515;&#20129;</span> wrong, even though both mean &ldquo;death.&rdquo;</p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="stat-total">&mdash;</div><div class="l">flagged answer pairs</div></div>
+      <div class="stat"><div class="n" id="stat-questions">&mdash;</div><div class="l">questions affected</div></div>
+      <div class="stat"><div class="n accent" id="stat-confirmed">&mdash;</div><div class="l">confirmed by the dataset's own wrong&#8209;answer list</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="charts">
+    <div class="panel">
+      <h2>By evidence</h2>
+      <div id="chart-source"></div>
+    </div>
+    <div class="panel">
+      <h2>Synonym cluster size</h2>
+      <div id="chart-cluster"></div>
+    </div>
+    <div class="panel">
+      <h2>Most contested glosses</h2>
+      <div id="chart-meanings"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search" placeholder="Search word, reading, or gloss&hellip;" autocomplete="off">
+    </div>
+    <div class="seg" id="seg-source" role="group" aria-label="Filter by evidence">
+      <button data-v="all" class="active">All</button>
+      <button data-v="confirmed">Confirmed</button>
+      <button data-v="cluster">Heuristic only</button>
+    </div>
+    <select id="sort">
+      <option value="default">Sort: strongest evidence</option>
+      <option value="cluster_size">Sort: cluster size (small first)</option>
+      <option value="question_id">Sort: question ID</option>
+    </select>
+    <div class="result-count"><b id="result-count">&mdash;</b> matching</div>
+  </div>
+
+  <div id="cards"></div>
+  <div class="pager" id="pager" hidden>
+    <button id="prev">&larr; Prev</button>
+    <span class="pg" id="pg-label"></span>
+    <button id="next">Next &rarr;</button>
+  </div>
+  <div class="empty" id="empty" hidden>No flagged questions match that search.</div>
+
+  <footer>
+    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_ambiguous_study_answers.py</code>. A flag means the candidate word's primary English gloss overlaps the question's bolded translation cue and its kana/kanji aren't present in that question's accepted answers &mdash; a heuristic over glosses, not a grammar check, so borderline cases are worth a human read. &ldquo;Confirmed&rdquo; rows additionally appear in that question's own <code>wrong_answers</code> field.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script type="text/csv" id="csv-data">__CSV_DATA__</script>
+<script>
+(function(){
+  "use strict";
+
+  var raw = document.getElementById('csv-data').textContent;
+  var parsed = Papa.parse(raw, {header:true, skipEmptyLines:true});
+  var rows = parsed.data;
+
+  var TIER = {
+    'cluster+wrong_answers': {rank:0, cls:'tier-strong', label:'Confirmed · both signals'},
+    'wrong_answers':          {rank:1, cls:'tier-listed', label:'Confirmed · dataset‑listed'},
+    'cluster':                {rank:2, cls:'tier-heuristic', label:'Heuristic · unconfirmed'}
+  };
+
+  rows.forEach(function(r, i){
+    r._id = i;
+    r._tier = TIER[r.source] || TIER.cluster;
+    r._confirmed = r.source !== 'cluster';
+    r._search = (r.vocab_title+' '+r.answer+' '+r.candidate_title+' '+r.candidate_kana+' '+r.shared_meaning).toLowerCase();
+  });
+
+  var totalQuestions = new Set(rows.map(function(r){return r.study_question_id;})).size;
+  var confirmedCount = rows.filter(function(r){return r._confirmed;}).length;
+  document.getElementById('stat-total').textContent = rows.length.toLocaleString();
+  document.getElementById('stat-questions').textContent = totalQuestions.toLocaleString();
+  document.getElementById('stat-confirmed').textContent = confirmedCount.toLocaleString();
+
+  // ---- chart: by evidence (source) ----
+  var sourceOrder = ['cluster+wrong_answers','wrong_answers','cluster'];
+  var sourceCounts = {};
+  sourceOrder.forEach(function(s){sourceCounts[s]=0;});
+  rows.forEach(function(r){ sourceCounts[r.source] = (sourceCounts[r.source]||0)+1; });
+  var maxSource = Math.max.apply(null, sourceOrder.map(function(s){return sourceCounts[s];}));
+  var sourceColor = {'cluster+wrong_answers':'var(--accent)','wrong_answers':'var(--accent-ink)','cluster':'var(--muted)'};
+  var sourceLabel = {'cluster+wrong_answers':'Both signals','wrong_answers':'Dataset‑listed','cluster':'Heuristic only'};
+  var chartSourceEl = document.getElementById('chart-source');
+  sourceOrder.forEach(function(s){
+    var pct = Math.round(sourceCounts[s]/maxSource*100);
+    var row = document.createElement('div');
+    row.className = 'bar-row clickable';
+    row.dataset.source = s;
+    row.innerHTML =
+      '<span class="lbl">'+sourceLabel[s]+'</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:'+sourceColor[s]+'"></span></span>'+
+      '<span class="bar-count">'+sourceCounts[s].toLocaleString()+'</span>';
+    row.addEventListener('click', function(){
+      var target = s === 'cluster' ? 'cluster' : 'confirmed';
+      setSourceFilter(target);
+    });
+    chartSourceEl.appendChild(row);
+  });
+
+  // ---- chart: cluster size distribution (cluster-sourced rows only) ----
+  var clusterCounts = {};
+  rows.forEach(function(r){
+    if(r.cluster_size){ clusterCounts[r.cluster_size] = (clusterCounts[r.cluster_size]||0)+1; }
+  });
+  var clusterSizes = Object.keys(clusterCounts).sort(function(a,b){return a-b;});
+  var maxCluster = Math.max.apply(null, clusterSizes.map(function(s){return clusterCounts[s];}));
+  var chartClusterEl = document.getElementById('chart-cluster');
+  clusterSizes.forEach(function(sz){
+    var pct = Math.round(clusterCounts[sz]/maxCluster*100);
+    var row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML =
+      '<span class="lbl">'+sz+' words share it</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:var(--accent)"></span></span>'+
+      '<span class="bar-count">'+clusterCounts[sz].toLocaleString()+'</span>';
+    chartClusterEl.appendChild(row);
+  });
+
+  // ---- chart: top contested glosses ----
+  var meaningCounts = {};
+  rows.forEach(function(r){ meaningCounts[r.shared_meaning] = (meaningCounts[r.shared_meaning]||0)+1; });
+  var topMeanings = Object.keys(meaningCounts).sort(function(a,b){return meaningCounts[b]-meaningCounts[a];}).slice(0,8);
+  var maxMeaning = meaningCounts[topMeanings[0]] || 1;
+  var chartMeaningEl = document.getElementById('chart-meanings');
+  topMeanings.forEach(function(m){
+    var pct = Math.round(meaningCounts[m]/maxMeaning*100);
+    var row = document.createElement('div');
+    row.className = 'meaning-row';
+    row.innerHTML =
+      '<span class="jp" title="'+m+'">“'+m+'”</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:var(--accent)"></span></span>'+
+      '<span class="bar-count">'+meaningCounts[m]+'</span>';
+    chartMeaningEl.appendChild(row);
+  });
+
+  // ---- filter / sort / paginate ----
+  var state = {q:'', source:'all', sort:'default', page:1};
+  var PAGE_SIZE = 24;
+
+  function setSourceFilter(v){
+    state.source = v; state.page = 1;
+    document.querySelectorAll('#seg-source button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.v===v);
+    });
+    render();
+  }
+
+  document.querySelectorAll('#seg-source button').forEach(function(b){
+    b.addEventListener('click', function(){ setSourceFilter(b.dataset.v); });
+  });
+  document.getElementById('sort').addEventListener('change', function(e){
+    state.sort = e.target.value; state.page = 1; render();
+  });
+  var searchTimer;
+  document.getElementById('search').addEventListener('input', function(e){
+    clearTimeout(searchTimer);
+    var v = e.target.value;
+    searchTimer = setTimeout(function(){ state.q = v.toLowerCase().trim(); state.page = 1; render(); }, 120);
+  });
+
+  function escapeHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderContent(html){
+    return html.replace(/____/g, '<span class="blank">____<\/span>');
+  }
+
+  function cardHtml(r){
+    var altNote = '';
+    if(r.alternate_answers){
+      altNote = '<div class="compare-alts">also accepts: '+escapeHtml(r.alternate_answers)+'</div>';
+    }
+    var wrongNote = '';
+    if(r.wrong_answers){
+      wrongNote = '<div class="wrong-note">&#9873; this question already lists <span style="font-family:var(--font-jp)">'+escapeHtml(r.wrong_answers)+'</span> as a wrong answer</div>';
+    }
+    return (
+      '<div class="card">'+
+        '<div class="card-head">'+
+          '<span class="chip '+r._tier.cls+'">'+r._tier.label+'</span>'+
+          '<span class="card-meta"><span>Q #'+escapeHtml(r.study_question_id)+'</span>'+(r.cluster_size?('<span>cluster of '+r.cluster_size+'<\/span>'):'')+'</span>'+
+        '</div>'+
+        '<div class="jp-sentence">'+renderContent(r.content)+'</div>'+
+        '<div class="compare">'+
+          '<div class="compare-side accepted">'+
+            '<span class="compare-tag">&#10003; Accepted<\/span>'+
+            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><\/div>'+
+            altNote+
+          '<\/div>'+
+          '<div class="compare-divider">both mean<b>&ldquo;'+escapeHtml(r.shared_meaning)+'&rdquo;<\/b><\/div>'+
+          '<div class="compare-side rejected">'+
+            '<span class="compare-tag">&#10007; Not accepted<\/span>'+
+            '<div class="compare-word"><span class="jp">'+escapeHtml(r.candidate_title)+'<\/span><span class="reading">'+escapeHtml(r.candidate_kana)+'<\/span><\/div>'+
+          '<\/div>'+
+        '<\/div>'+
+        '<div class="translation">'+r.translation+'<\/div>'+
+        wrongNote+
+      '<\/div>'
+    );
+  }
+
+  function render(){
+    var q = state.q;
+    var filtered = rows.filter(function(r){
+      if(state.source==='confirmed' && !r._confirmed) return false;
+      if(state.source==='cluster' && r._confirmed) return false;
+      if(q && r._search.indexOf(q)===-1) return false;
+      return true;
+    });
+
+    if(state.sort==='cluster_size'){
+      filtered = filtered.slice().sort(function(a,b){
+        var av = a.cluster_size?+a.cluster_size:999, bv = b.cluster_size?+b.cluster_size:999;
+        return av-bv || (+a.study_question_id - +b.study_question_id);
+      });
+    } else if(state.sort==='question_id'){
+      filtered = filtered.slice().sort(function(a,b){ return +a.study_question_id - +b.study_question_id; });
+    } else {
+      filtered = filtered.slice().sort(function(a,b){
+        return a._tier.rank - b._tier.rank || (+a.study_question_id - +b.study_question_id);
+      });
+    }
+
+    document.getElementById('result-count').textContent = filtered.length.toLocaleString();
+
+    var totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+    if(state.page>totalPages) state.page = totalPages;
+    var start = (state.page-1)*PAGE_SIZE;
+    var pageRows = filtered.slice(start, start+PAGE_SIZE);
+
+    var cardsEl = document.getElementById('cards');
+    var emptyEl = document.getElementById('empty');
+    var pagerEl = document.getElementById('pager');
+
+    if(pageRows.length===0){
+      cardsEl.innerHTML = '';
+      emptyEl.hidden = false;
+      pagerEl.hidden = true;
+      return;
+    }
+    emptyEl.hidden = true;
+    cardsEl.innerHTML = pageRows.map(cardHtml).join('');
+
+    pagerEl.hidden = totalPages<=1;
+    document.getElementById('pg-label').textContent = 'Page '+state.page+' of '+totalPages;
+    document.getElementById('prev').disabled = state.page<=1;
+    document.getElementById('next').disabled = state.page>=totalPages;
+  }
+
+  document.getElementById('prev').addEventListener('click', function(){ if(state.page>1){state.page--; render(); window.scrollTo({top:document.querySelector('.controls').offsetTop-16, behavior:'smooth'});} });
+  document.getElementById('next').addEventListener('click', function(){ state.page++; render(); window.scrollTo({top:document.querySelector('.controls').offsetTop-16, behavior:'smooth'}); });
+
+  render();
+})();
+</script>
