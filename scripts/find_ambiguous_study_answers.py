@@ -110,6 +110,7 @@ def load_vocab():
             vocab[vid] = {
                 "title": row["title"],
                 "kana": row["kana"],
+                "jlpt_level": row["jlpt_level"],
                 "accepted_answers": row["accepted_answers"],
                 "glosses": all_glosses(row["accepted_answers"] or ""),
                 "primary": primary,
@@ -193,6 +194,7 @@ def main() -> None:
         "study_question_id",
         "vocab_id",
         "vocab_title",
+        "vocab_jlpt_level",
         "content",
         "answer",
         "alternate_answers",
@@ -202,6 +204,7 @@ def main() -> None:
         "candidate_vocab_id",
         "candidate_title",
         "candidate_kana",
+        "candidate_jlpt_level",
         "candidate_accepted_answers",
     ]
     flagged = []
@@ -232,6 +235,7 @@ def main() -> None:
                         "study_question_id": row["study_question_id"],
                         "vocab_id": vid,
                         "vocab_title": row["vocab_title"],
+                        "vocab_jlpt_level": v["jlpt_level"],
                         "content": row["content"],
                         "answer": row["answer"],
                         "alternate_answers": row["alternate_answers"],
@@ -241,6 +245,7 @@ def main() -> None:
                         "candidate_vocab_id": cid,
                         "candidate_title": cand["title"],
                         "candidate_kana": cand["kana"],
+                        "candidate_jlpt_level": cand["jlpt_level"],
                         "candidate_accepted_answers": cand["accepted_answers"],
                     }
                 )

@@ -222,11 +222,13 @@ h1 .stamp{
 }
 .seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-select#sort{
+select#sort,.select-wrap select{
   font-family:var(--font-body);font-size:12.5px;
   padding:8px 10px;border-radius:8px;border:1px solid var(--line-strong);
   background:var(--paper);color:var(--ink);
 }
+.select-wrap{display:flex;align-items:center;gap:8px}
+.select-wrap label{font-size:12.5px;color:var(--muted);white-space:nowrap}
 .result-count{font-size:12.5px;color:var(--muted);white-space:nowrap}
 .result-count b{color:var(--ink);font-variant-numeric:tabular-nums}
 
@@ -278,6 +280,10 @@ select#sort{
 .compare-word{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .compare-word .jp{font-family:var(--font-jp);font-size:19px;font-weight:600;color:var(--ink)}
 .compare-word .reading{font-family:var(--font-jp);font-size:13px;color:var(--muted)}
+.level-tag{
+  font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.02em;
+  color:var(--muted);border:1px solid var(--line-strong);border-radius:4px;padding:1px 5px;
+}
 .compare-alts{font-size:11.5px;color:var(--muted);margin-top:6px}
 .compare-divider{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -366,6 +372,16 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
       <button data-v="confirmed">Confirmed</button>
       <button data-v="cluster">Heuristic only</button>
     </div>
+    <div class="select-wrap">
+      <label for="level">Level</label>
+      <select id="level">
+        <option value="1">N5 only</option>
+        <option value="2">N5&ndash;N4</option>
+        <option value="3">N5&ndash;N3</option>
+        <option value="4">N5&ndash;N2</option>
+        <option value="5" selected>N5&ndash;N1 (all)</option>
+      </select>
+    </div>
     <select id="sort">
       <option value="default">Sort: strongest evidence</option>
       <option value="cluster_size">Sort: cluster size (small first)</option>
@@ -403,10 +419,22 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     'cluster':                {rank:2, cls:'tier-heuristic', label:'Heuristic · unconfirmed'}
   };
 
+  // Levels are cumulative from easiest to hardest: picking N3 means "N3 and
+  // everything easier than it" - matches generate_similarity_explorer.py.
+  var LEVEL_ORDER = ['N5','N4','N3','N2','N1'];
+  function levelRank(lvl){
+    var i = LEVEL_ORDER.indexOf(lvl);
+    return i===-1 ? LEVEL_ORDER.length-1 : i;
+  }
+
   rows.forEach(function(r, i){
     r._id = i;
     r._tier = TIER[r.source] || TIER.cluster;
     r._confirmed = r.source !== 'cluster';
+    // A question is only "within" a level range if BOTH the tested word and the
+    // candidate synonym are - the harder of the two gates it, same rule
+    // generate_similarity_explorer.py applies to an edge's two endpoints.
+    r._levelRank = Math.max(levelRank(r.vocab_jlpt_level), levelRank(r.candidate_jlpt_level));
     r._search = (r.vocab_title+' '+r.answer+' '+r.candidate_title+' '+r.candidate_kana+' '+r.shared_meaning).toLowerCase();
   });
 
@@ -478,8 +506,12 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   });
 
   // ---- filter / sort / paginate ----
-  var state = {q:'', source:'all', sort:'default', page:1};
+  var state = {q:'', source:'all', level:LEVEL_ORDER.length, sort:'default', page:1};
   var PAGE_SIZE = 24;
+
+  document.getElementById('level').addEventListener('change', function(e){
+    state.level = parseInt(e.target.value, 10); state.page = 1; render();
+  });
 
   function setSourceFilter(v){
     state.source = v; state.page = 1;
@@ -529,13 +561,13 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
         '<div class="compare">'+
           '<div class="compare-side accepted">'+
             '<span class="compare-tag">&#10003; Accepted<\/span>'+
-            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><\/div>'+
+            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
             altNote+
           '<\/div>'+
           '<div class="compare-divider">both mean<b>&ldquo;'+escapeHtml(r.shared_meaning)+'&rdquo;<\/b><\/div>'+
           '<div class="compare-side rejected">'+
             '<span class="compare-tag">&#10007; Not accepted<\/span>'+
-            '<div class="compare-word"><span class="jp">'+escapeHtml(r.candidate_title)+'<\/span><span class="reading">'+escapeHtml(r.candidate_kana)+'<\/span><\/div>'+
+            '<div class="compare-word"><span class="jp">'+escapeHtml(r.candidate_title)+'<\/span><span class="reading">'+escapeHtml(r.candidate_kana)+'<\/span><span class="level-tag">'+escapeHtml(r.candidate_jlpt_level)+'<\/span><\/div>'+
           '<\/div>'+
         '<\/div>'+
         '<div class="translation">'+r.translation+'<\/div>'+
@@ -549,6 +581,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     var filtered = rows.filter(function(r){
       if(state.source==='confirmed' && !r._confirmed) return false;
       if(state.source==='cluster' && r._confirmed) return false;
+      if(r._levelRank >= state.level) return false;
       if(q && r._search.indexOf(q)===-1) return false;
       return true;
     });
