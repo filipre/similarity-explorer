@@ -125,8 +125,22 @@ def load_vocab():
 
 
 def accepted_forms_for_question(row: dict) -> set[str]:
+    """Every Japanese answer form this question's grader accepts.
+
+    alternate_grammar lists other accepted spellings/conjugations of the
+    *same* answer (e.g. plain vs polite form, or dropping an honorific
+    prefix like おふろ -> ふろ) - it always includes `answer` itself among
+    its semicolon-separated items. alternate_answers lists accepted
+    synonyms/variants beyond that one word. Both count as "already
+    accepted" - missing either makes a genuinely-accepted answer look
+    unaccepted.
+    """
     forms = set()
-    for raw in [row["answer"], *split_semicolon_list(row["alternate_answers"])]:
+    for raw in [
+        row["answer"],
+        *split_semicolon_list(row["alternate_grammar"]),
+        *split_semicolon_list(row["alternate_answers"]),
+    ]:
         raw = raw.strip()
         if raw:
             forms.add(to_hiragana(raw.lower()))
@@ -197,6 +211,7 @@ def main() -> None:
         "vocab_jlpt_level",
         "content",
         "answer",
+        "alternate_grammar",
         "alternate_answers",
         "wrong_answers",
         "translation",
@@ -238,6 +253,7 @@ def main() -> None:
                         "vocab_jlpt_level": v["jlpt_level"],
                         "content": row["content"],
                         "answer": row["answer"],
+                        "alternate_grammar": row["alternate_grammar"],
                         "alternate_answers": row["alternate_answers"],
                         "wrong_answers": row["wrong_answers"],
                         "translation": row["translation"],

@@ -542,10 +542,21 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     return html.replace(/____/g, '<span class="blank">____<\/span>');
   }
 
+  function otherAcceptedForms(r){
+    var seen = {}; seen[r.answer] = true;
+    var out = [];
+    (r.alternate_grammar+';'+r.alternate_answers).split(';').forEach(function(t){
+      t = t.trim();
+      if(t && !seen[t]){ seen[t] = true; out.push(t); }
+    });
+    return out;
+  }
+
   function cardHtml(r){
     var altNote = '';
-    if(r.alternate_answers){
-      altNote = '<div class="compare-alts">also accepts: '+escapeHtml(r.alternate_answers)+'</div>';
+    var otherForms = otherAcceptedForms(r);
+    if(otherForms.length){
+      altNote = '<div class="compare-alts">also accepts: '+escapeHtml(otherForms.join('; '))+'</div>';
     }
     var wrongNote = '';
     if(r.wrong_answers){
