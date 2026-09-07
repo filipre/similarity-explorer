@@ -67,6 +67,15 @@
 }
 
 *{box-sizing:border-box}
+/* The Artifact viewer injects this same rule when publishing, which is why
+   the published report never showed the bug this works around: opened as a
+   plain standalone file (e.g. straight from generate_ambiguous_answers_report.py),
+   there's no such reset, and .pager{display:flex} below - an author-origin
+   rule - silently wins over the browser's own default `[hidden]{display:none}`
+   (always lowest-priority, easily overridden without !important) - so a
+   hidden pager rendered anyway. Declaring it ourselves makes hidden work
+   the same whether the page is opened standalone or through the viewer. */
+[hidden]{display:none!important}
 body{
   background:var(--paper);
   color:var(--ink);
