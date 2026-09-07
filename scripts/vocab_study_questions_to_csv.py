@@ -18,8 +18,22 @@ FIELDNAMES = [
     "study_question_id",
     "content",
     "answer",
+    "alternate_grammar",
+    "alternate_answers",
+    "wrong_answers",
     "translation",
 ]
+
+
+def join_answers(values) -> str:
+    """Flatten alternate_grammar (a list) or alternate_answers/wrong_answers
+    (dicts keyed by answer text) into a single "; "-separated string.
+    """
+    if not values:
+        return ""
+    if isinstance(values, dict):
+        values = values.keys()
+    return "; ".join(values)
 
 
 def main() -> None:
@@ -41,6 +55,9 @@ def main() -> None:
                     "study_question_id": question["id"],
                     "content": question["content"],
                     "answer": question["answer"],
+                    "alternate_grammar": join_answers(question.get("alternate_grammar")),
+                    "alternate_answers": join_answers(question.get("alternate_answers")),
+                    "wrong_answers": join_answers(question.get("wrong_answers")),
                     "translation": question["translation"],
                 }
             )
