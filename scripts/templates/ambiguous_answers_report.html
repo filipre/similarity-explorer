@@ -601,8 +601,14 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
 
     document.getElementById('result-count').textContent = filtered.length.toLocaleString();
 
-    var totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
-    if(state.page>totalPages) state.page = totalPages;
+    // totalPages is 0 for an empty result set, never 1-as-a-fallback - that
+    // false "1 page" was what let a stale pager slip through before: it made
+    // `totalPages<=1` look like "hide" but the *value itself* still claimed
+    // a page existed. Computed once here, it's the single source of truth
+    // every visibility/label decision below reads from - nothing after this
+    // line re-derives "are there any pages" on its own.
+    var totalPages = Math.ceil(filtered.length/PAGE_SIZE);
+    if(state.page>totalPages) state.page = Math.max(1, totalPages);
     var start = (state.page-1)*PAGE_SIZE;
     var pageRows = filtered.slice(start, start+PAGE_SIZE);
 
@@ -610,16 +616,11 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     var emptyEl = document.getElementById('empty');
     var pagerEl = document.getElementById('pager');
 
-    if(pageRows.length===0){
-      cardsEl.innerHTML = '';
-      emptyEl.hidden = false;
-      pagerEl.hidden = true;
-      return;
-    }
-    emptyEl.hidden = true;
+    emptyEl.hidden = filtered.length>0;
+    pagerEl.hidden = totalPages<=1;
     cardsEl.innerHTML = pageRows.map(cardHtml).join('');
 
-    pagerEl.hidden = totalPages<=1;
+    if(pagerEl.hidden) return;
     document.getElementById('pg-label').textContent = 'Page '+state.page+' of '+totalPages;
     document.getElementById('prev').disabled = state.page<=1;
     document.getElementById('next').disabled = state.page>=totalPages;
