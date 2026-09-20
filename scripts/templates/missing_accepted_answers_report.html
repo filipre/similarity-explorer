@@ -1,0 +1,629 @@
+<title>Coverage Gaps</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F2F5F6;
+  --surface:#FFFFFF;
+  --surface-2:#EAEFF1;
+  --ink:#1C1F24;
+  --ink-soft:#4B525A;
+  --muted:#767F87;
+  --line:#DBE3E6;
+  --line-strong:#C2CDD1;
+  --accent:#2A6FC7;
+  --accent-ink:#1C4E8F;
+  --accent-soft:#E7EFFB;
+  --accent-contrast:#FFFFFF;
+  --amber-ink:#8A5A00;
+  --amber-soft:#FFF3D9;
+  --good-ink:#2A7350;
+  --good-soft:#E4F3EA;
+  --shadow:0 1px 2px rgba(20,24,28,.06),0 10px 28px -14px rgba(20,24,28,.22);
+  --font-display:'Newsreader',Georgia,'Noto Serif JP',serif;
+  --font-body:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-jp:'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#15171B;
+    --surface:#1C1F24;
+    --surface-2:#23272D;
+    --ink:#EDEFF2;
+    --ink-soft:#B7BEC6;
+    --muted:#868F98;
+    --line:#2B3038;
+    --line-strong:#3A414A;
+    --accent:#6FA3E6;
+    --accent-ink:#8FB8EE;
+    --accent-soft:#182636;
+    --accent-contrast:#0E1116;
+    --amber-ink:#E4B646;
+    --amber-soft:#33290F;
+    --good-ink:#63C093;
+    --good-soft:#15271E;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#15171B;
+  --surface:#1C1F24;
+  --surface-2:#23272D;
+  --ink:#EDEFF2;
+  --ink-soft:#B7BEC6;
+  --muted:#868F98;
+  --line:#2B3038;
+  --line-strong:#3A414A;
+  --accent:#6FA3E6;
+  --accent-ink:#8FB8EE;
+  --accent-soft:#182636;
+  --accent-contrast:#0E1116;
+  --amber-ink:#E4B646;
+  --amber-soft:#33290F;
+  --good-ink:#63C093;
+  --good-soft:#15271E;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 80px}
+
+/* ---------- header ---------- */
+header.top{
+  position:relative;
+  padding:52px 24px 40px;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, var(--line) 27px, var(--line) 28px),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, var(--line) 27px, var(--line) 28px);
+  background-color:var(--surface);
+  border-bottom:1px solid var(--line);
+  overflow:hidden;
+}
+header.top::after{
+  content:"";
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse 700px 320px at 12% -10%, var(--paper) 0%, transparent 70%);
+  pointer-events:none;
+}
+.top-inner{max-width:1180px;margin:0 auto;position:relative}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:12px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:14px;
+}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+h1{
+  font-family:var(--font-display);
+  font-style:italic;
+  font-weight:500;
+  font-size:clamp(34px,5vw,52px);
+  margin:0 0 12px;
+  text-wrap:balance;
+  color:var(--ink);
+}
+h1 .stamp{
+  font-style:normal;
+  color:var(--accent);
+}
+.dek{
+  font-size:16px;
+  color:var(--ink-soft);
+  max-width:64ch;
+  margin:0 0 32px;
+}
+.dek b{color:var(--ink);font-weight:600}
+.dek code{font-family:var(--font-mono);font-size:14px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:14px 18px;
+  min-width:150px;
+  box-shadow:var(--shadow);
+}
+.stat .n{
+  font-family:var(--font-mono);
+  font-variant-numeric:tabular-nums;
+  font-size:26px;
+  font-weight:600;
+  color:var(--ink);
+  line-height:1.1;
+}
+.stat .n.accent{color:var(--accent-ink)}
+.stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* ---------- charts section ---------- */
+.charts{
+  display:grid;
+  grid-template-columns:1fr 0.8fr 1.2fr;
+  gap:16px;
+  margin:32px 0 8px;
+}
+@media (max-width:860px){.charts{grid-template-columns:1fr}}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px 22px 18px;
+}
+.panel h2{
+  font-family:var(--font-body);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin:0 0 16px;
+}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:default}
+.bar-row.clickable{cursor:pointer}
+.bar-row .lbl{
+  font-size:12.5px;color:var(--ink-soft);width:96px;flex:0 0 auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.bar-track{flex:1;height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.bar-fill{display:block;height:100%;border-radius:5px;transition:filter .15s}
+.bar-row.clickable:hover .bar-fill{filter:brightness(1.12)}
+.bar-row.active .lbl{color:var(--ink);font-weight:600}
+.bar-count{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:12.5px;color:var(--muted);width:48px;text-align:right;flex:0 0 auto;
+}
+.gloss-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+.gloss-row .term{font-family:var(--font-body);color:var(--ink);width:120px;flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gloss-row .bar-track{height:7px}
+.gloss-row .bar-count{width:34px}
+
+/* ---------- filters ---------- */
+.controls{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:36px 0 18px;
+  padding:14px 18px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+.search{
+  flex:1 1 240px;
+  position:relative;
+}
+.search input{
+  width:100%;
+  font-family:var(--font-body);
+  font-size:14px;
+  padding:9px 12px 9px 34px;
+  border:1px solid var(--line-strong);
+  border-radius:8px;
+  background:var(--paper);
+  color:var(--ink);
+}
+.search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5}
+.seg{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg button{
+  font-family:var(--font-body);font-size:12.5px;font-weight:500;
+  padding:6px 11px;border-radius:6px;border:none;background:transparent;color:var(--ink-soft);
+  cursor:pointer;white-space:nowrap;
+}
+.seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select#sort,.select-wrap select{
+  font-family:var(--font-body);font-size:12.5px;
+  padding:8px 10px;border-radius:8px;border:1px solid var(--line-strong);
+  background:var(--paper);color:var(--ink);
+}
+.select-wrap{display:flex;align-items:center;gap:8px}
+.select-wrap label{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.result-count{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.result-count b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---------- cards ---------- */
+#cards{display:flex;flex-direction:column;gap:14px}
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px 22px;
+  box-shadow:var(--shadow);
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  padding:4px 10px;border-radius:100px;
+}
+.chip.tier-close{background:var(--amber-soft);color:var(--amber-ink)}
+.chip.tier-distant{background:var(--surface-2);color:var(--ink-soft)}
+.card-meta{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);display:flex;gap:14px;align-items:center}
+.card-meta span{white-space:nowrap}
+
+.jp-sentence{
+  font-family:var(--font-jp);
+  font-size:17px;
+  line-height:1.9;
+  color:var(--ink);
+  margin-bottom:16px;
+}
+.jp-sentence .blank{
+  display:inline-block;
+  min-width:2.6em;
+  border-bottom:2px solid var(--accent);
+  color:var(--accent-ink);
+  text-align:center;
+  font-weight:600;
+}
+.jp-sentence .vocab-popout{color:inherit;border-bottom:1px dotted var(--line-strong)}
+
+.compare{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.compare-side{padding:14px 16px;background:var(--surface)}
+.compare-side.accepted{background:var(--good-soft)}
+.compare-side.rejected{background:var(--accent-soft)}
+.compare-tag{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.compare-side.accepted .compare-tag{color:var(--good-ink)}
+.compare-side.rejected .compare-tag{color:var(--accent-ink)}
+.compare-word{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.compare-word .jp{font-family:var(--font-jp);font-size:19px;font-weight:600;color:var(--ink)}
+.compare-word .reading{font-family:var(--font-jp);font-size:13px;color:var(--muted)}
+.level-tag{
+  font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.02em;
+  color:var(--muted);border:1px solid var(--line-strong);border-radius:4px;padding:1px 5px;
+}
+.gloss-list{font-size:12px;color:var(--ink-soft);margin-top:8px;max-height:60px;overflow:auto;line-height:1.6}
+.missing-term{font-size:16px;font-weight:600;color:var(--accent-ink)}
+.compare-divider{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:14px 14px;background:var(--surface-2);
+  font-size:11px;color:var(--muted);text-align:center;line-height:1.4;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);
+  min-width:130px;
+}
+.compare-divider b{font-family:var(--font-body);font-size:13px;color:var(--ink);font-weight:600;display:block;margin-top:2px}
+.sim-gauge{width:100px;height:6px;background:var(--surface);border:1px solid var(--line);border-radius:3px;position:relative;margin:8px 0 4px}
+.sim-gauge .fill{position:absolute;top:0;left:0;bottom:0;border-radius:3px;background:var(--accent)}
+.sim-gauge .threshold{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-soft);left:75%}
+.sim-value{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);font-weight:600}
+@media (max-width:640px){
+  .compare{grid-template-columns:1fr}
+  .compare-divider{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);flex-direction:row;gap:10px}
+  .sim-gauge{margin:0}
+}
+
+.translation{
+  font-size:13.5px;
+  color:var(--ink-soft);
+  padding-top:12px;
+  border-top:1px dashed var(--line);
+}
+.translation strong{color:var(--accent-ink);font-weight:700}
+
+.empty{
+  text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;
+}
+
+/* ---------- pagination ---------- */
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:28px}
+.pager button{
+  font-family:var(--font-body);font-size:13px;font-weight:600;
+  padding:8px 16px;border-radius:8px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);cursor:pointer;
+}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+.pager button:not(:disabled):hover{border-color:var(--accent)}
+.pager .pg{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+footer{
+  max-width:1180px;margin:48px auto 0;padding:20px 24px 0;
+  border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted);line-height:1.7;
+}
+footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="eyebrow"><span class="dot"></span>similarity&#8209;explorer &middot; gloss coverage</div>
+    <h1>Coverage <span class="stamp">Gaps</span></h1>
+    <p class="dek">Fill&#8209;in&#8209;the&#8209;blank questions whose translation bolds an English meaning that isn't listed in the tested word's own <code>accepted_answers</code> &mdash; found by comparing sentence&#8209;embedding similarity, not exact text, so inflected forms like &ldquo;recommended&rdquo; still match &ldquo;recommendation.&rdquo; Most rows below are genuine gaps worth adding, not translation errors.</p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="stat-total">&mdash;</div><div class="l">flagged questions</div></div>
+      <div class="stat"><div class="n" id="stat-vocab">&mdash;</div><div class="l">vocab entries affected</div></div>
+      <div class="stat"><div class="n accent" id="stat-close">&mdash;</div><div class="l">close calls (&ge;0.65 similarity) &mdash; worth a second look</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="charts">
+    <div class="panel">
+      <h2>By similarity to closest accepted gloss</h2>
+      <div id="chart-sim"></div>
+    </div>
+    <div class="panel">
+      <h2>By JLPT level</h2>
+      <div id="chart-level"></div>
+    </div>
+    <div class="panel">
+      <h2>Most common missing glosses</h2>
+      <div id="chart-glosses"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search" placeholder="Search word or gloss&hellip;" autocomplete="off">
+    </div>
+    <div class="seg" id="seg-tier" role="group" aria-label="Filter by similarity">
+      <button data-v="all" class="active">All</button>
+      <button data-v="close">Close call</button>
+      <button data-v="distant">Distant gap</button>
+    </div>
+    <div class="select-wrap">
+      <label for="level">Level</label>
+      <select id="level">
+        <option value="1">N5 only</option>
+        <option value="2">N5&ndash;N4</option>
+        <option value="3">N5&ndash;N3</option>
+        <option value="4">N5&ndash;N2</option>
+        <option value="5" selected>N5&ndash;N1 (all)</option>
+      </select>
+    </div>
+    <select id="sort">
+      <option value="default">Sort: closest match first</option>
+      <option value="similarity_asc">Sort: most distant first</option>
+      <option value="vocab">Sort: vocab word (A&ndash;Z)</option>
+      <option value="question_id">Sort: question ID</option>
+    </select>
+    <div class="result-count"><b id="result-count">&mdash;</b> matching</div>
+  </div>
+
+  <div id="cards"></div>
+  <div class="pager" id="pager" hidden>
+    <button id="prev">&larr; Prev</button>
+    <span class="pg" id="pg-label"></span>
+    <button id="next">Next &rarr;</button>
+  </div>
+  <div class="empty" id="empty" hidden>No flagged questions match that search.</div>
+
+  <footer>
+    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_missing_accepted_answers.py</code>, using the same local sentence&#8209;embedding model (<code>BAAI/bge-large-en-v1.5</code>) this project already uses for vocab similarity &mdash; no network LLM calls. A row is flagged when no accepted_answers gloss reaches 0.75 cosine similarity with the question's bolded translation. &ldquo;Close call&rdquo; rows (0.65&ndash;0.75) sit right below that cutoff and are the most likely to be borderline calls rather than real gaps; everything else is a heuristic audit of gloss coverage, so still worth a human read.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script type="text/csv" id="csv-data">__CSV_DATA__</script>
+<script>
+(function(){
+  "use strict";
+
+  var raw = document.getElementById('csv-data').textContent;
+  var parsed = Papa.parse(raw, {header:true, skipEmptyLines:true});
+  var rows = parsed.data;
+
+  var CLOSE_CALL_MIN = 0.65;
+
+  // Levels are cumulative from easiest to hardest: picking N3 means "N3 and
+  // everything easier than it" - matches generate_similarity_explorer.py.
+  var LEVEL_ORDER = ['N5','N4','N3','N2','N1'];
+  function levelRank(lvl){
+    var i = LEVEL_ORDER.indexOf(lvl);
+    return i===-1 ? LEVEL_ORDER.length-1 : i;
+  }
+
+  rows.forEach(function(r, i){
+    r._id = i;
+    r._sim = parseFloat(r.similarity) || 0;
+    r._close = r._sim >= CLOSE_CALL_MIN;
+    r._levelRank = levelRank(r.vocab_jlpt_level);
+    r._search = (r.vocab_title+' '+r.answer+' '+r.missing_glosses+' '+r.closest_accepted_gloss+' '+r.accepted_answers).toLowerCase();
+  });
+
+  var vocabCount = new Set(rows.map(function(r){return r.vocab_id;})).size;
+  var closeCount = rows.filter(function(r){return r._close;}).length;
+  document.getElementById('stat-total').textContent = rows.length.toLocaleString();
+  document.getElementById('stat-vocab').textContent = vocabCount.toLocaleString();
+  document.getElementById('stat-close').textContent = closeCount.toLocaleString();
+
+  // ---- chart: by similarity bucket ----
+  var buckets = [
+    {key:'lt50', lbl:'< 0.50', test:function(s){return s<0.50;}},
+    {key:'50_60', lbl:'0.50–0.60', test:function(s){return s>=0.50 && s<0.60;}},
+    {key:'60_65', lbl:'0.60–0.65', test:function(s){return s>=0.60 && s<0.65;}},
+    {key:'65_70', lbl:'0.65–0.70', test:function(s){return s>=0.65 && s<0.70;}},
+    {key:'70_75', lbl:'0.70–0.75', test:function(s){return s>=0.70;}}
+  ];
+  var bucketCounts = buckets.map(function(b){ return rows.filter(function(r){return b.test(r._sim);}).length; });
+  var maxBucket = Math.max.apply(null, bucketCounts);
+  var chartSimEl = document.getElementById('chart-sim');
+  buckets.forEach(function(b, idx){
+    var pct = maxBucket ? Math.round(bucketCounts[idx]/maxBucket*100) : 0;
+    var color = b.key==='65_70' || b.key==='70_75' ? 'var(--amber-ink)' : 'var(--accent)';
+    var row = document.createElement('div');
+    row.className = 'bar-row clickable';
+    row.innerHTML =
+      '<span class="lbl">'+b.lbl+'</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:'+color+'"></span></span>'+
+      '<span class="bar-count">'+bucketCounts[idx].toLocaleString()+'</span>';
+    row.addEventListener('click', function(){
+      setTierFilter(b.key==='65_70' || b.key==='70_75' ? 'close' : 'distant');
+    });
+    chartSimEl.appendChild(row);
+  });
+
+  // ---- chart: by JLPT level ----
+  var levelCounts = {};
+  LEVEL_ORDER.forEach(function(l){ levelCounts[l]=0; });
+  rows.forEach(function(r){ if(levelCounts[r.vocab_jlpt_level]!==undefined) levelCounts[r.vocab_jlpt_level]++; });
+  var maxLevel = Math.max.apply(null, LEVEL_ORDER.map(function(l){return levelCounts[l];}));
+  var chartLevelEl = document.getElementById('chart-level');
+  LEVEL_ORDER.forEach(function(l){
+    var pct = maxLevel ? Math.round(levelCounts[l]/maxLevel*100) : 0;
+    var row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML =
+      '<span class="lbl">'+l+'</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:var(--accent)"></span></span>'+
+      '<span class="bar-count">'+levelCounts[l].toLocaleString()+'</span>';
+    chartLevelEl.appendChild(row);
+  });
+
+  // ---- chart: top missing glosses ----
+  var glossCounts = {};
+  rows.forEach(function(r){
+    r.missing_glosses.split(';').forEach(function(g){
+      g = g.trim();
+      if(g){ glossCounts[g] = (glossCounts[g]||0)+1; }
+    });
+  });
+  var topGlosses = Object.keys(glossCounts).sort(function(a,b){return glossCounts[b]-glossCounts[a];}).slice(0,8);
+  var maxGloss = glossCounts[topGlosses[0]] || 1;
+  var chartGlossEl = document.getElementById('chart-glosses');
+  topGlosses.forEach(function(g){
+    var pct = Math.round(glossCounts[g]/maxGloss*100);
+    var row = document.createElement('div');
+    row.className = 'gloss-row';
+    row.innerHTML =
+      '<span class="term" title="'+g+'">&ldquo;'+g+'&rdquo;</span>'+
+      '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%;background:var(--accent)"></span></span>'+
+      '<span class="bar-count">'+glossCounts[g]+'</span>';
+    chartGlossEl.appendChild(row);
+  });
+
+  // ---- filter / sort / paginate ----
+  var state = {q:'', tier:'all', level:LEVEL_ORDER.length, sort:'default', page:1};
+  var PAGE_SIZE = 24;
+
+  document.getElementById('level').addEventListener('change', function(e){
+    state.level = parseInt(e.target.value, 10); state.page = 1; render();
+  });
+
+  function setTierFilter(v){
+    state.tier = v; state.page = 1;
+    document.querySelectorAll('#seg-tier button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.v===v);
+    });
+    render();
+  }
+
+  document.querySelectorAll('#seg-tier button').forEach(function(b){
+    b.addEventListener('click', function(){ setTierFilter(b.dataset.v); });
+  });
+  document.getElementById('sort').addEventListener('change', function(e){
+    state.sort = e.target.value; state.page = 1; render();
+  });
+  var searchTimer;
+  document.getElementById('search').addEventListener('input', function(e){
+    clearTimeout(searchTimer);
+    var v = e.target.value;
+    searchTimer = setTimeout(function(){ state.q = v.toLowerCase().trim(); state.page = 1; render(); }, 120);
+  });
+
+  function escapeHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderContent(html){
+    return html.replace(/____/g, '<span class="blank">____<\/span>');
+  }
+
+  function cardHtml(r){
+    var pct = Math.max(0, Math.min(100, Math.round(r._sim*100)));
+    var tierCls = r._close ? 'tier-close' : 'tier-distant';
+    var tierLabel = r._close ? 'Close call' : 'Distant gap';
+    return (
+      '<div class="card">'+
+        '<div class="card-head">'+
+          '<span class="chip '+tierCls+'">'+tierLabel+'</span>'+
+          '<span class="card-meta"><span>Q #'+escapeHtml(r.study_question_id)+'</span><span>vocab #'+escapeHtml(r.vocab_id)+'<\/span></span>'+
+        '</div>'+
+        '<div class="jp-sentence">'+renderContent(r.content)+'</div>'+
+        '<div class="compare">'+
+          '<div class="compare-side accepted">'+
+            '<span class="compare-tag">&#10003; accepted_answers<\/span>'+
+            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
+            '<div class="gloss-list">'+escapeHtml(r.accepted_answers)+'<\/div>'+
+          '<\/div>'+
+          '<div class="compare-divider">closest match<b>&ldquo;'+escapeHtml(r.closest_accepted_gloss)+'&rdquo;<\/b>'+
+            '<div class="sim-gauge"><span class="fill" style="width:'+pct+'%"></span><span class="threshold"></span></div>'+
+            '<span class="sim-value">'+r._sim.toFixed(2)+'<\/span>'+
+          '<\/div>'+
+          '<div class="compare-side rejected">'+
+            '<span class="compare-tag">&#10007; not covered<\/span>'+
+            '<div class="missing-term">'+escapeHtml(r.missing_glosses)+'<\/div>'+
+          '<\/div>'+
+        '<\/div>'+
+        '<div class="translation">'+r.translation+'<\/div>'+
+      '<\/div>'
+    );
+  }
+
+  function render(){
+    var q = state.q;
+    var filtered = rows.filter(function(r){
+      if(state.tier==='close' && !r._close) return false;
+      if(state.tier==='distant' && r._close) return false;
+      if(r._levelRank >= state.level) return false;
+      if(q && r._search.indexOf(q)===-1) return false;
+      return true;
+    });
+
+    if(state.sort==='similarity_asc'){
+      filtered = filtered.slice().sort(function(a,b){
+        return a._sim-b._sim || (+a.study_question_id - +b.study_question_id);
+      });
+    } else if(state.sort==='vocab'){
+      filtered = filtered.slice().sort(function(a,b){
+        return a.vocab_title.localeCompare(b.vocab_title, 'ja') || (+a.study_question_id - +b.study_question_id);
+      });
+    } else if(state.sort==='question_id'){
+      filtered = filtered.slice().sort(function(a,b){ return +a.study_question_id - +b.study_question_id; });
+    } else {
+      filtered = filtered.slice().sort(function(a,b){
+        return b._sim-a._sim || (+a.study_question_id - +b.study_question_id);
+      });
+    }
+
+    document.getElementById('result-count').textContent = filtered.length.toLocaleString();
+
+    var totalPages = Math.ceil(filtered.length/PAGE_SIZE);
+    if(state.page>totalPages) state.page = Math.max(1, totalPages);
+    var start = (state.page-1)*PAGE_SIZE;
+    var pageRows = filtered.slice(start, start+PAGE_SIZE);
+
+    var cardsEl = document.getElementById('cards');
+    var emptyEl = document.getElementById('empty');
+    var pagerEl = document.getElementById('pager');
+
+    emptyEl.hidden = filtered.length>0;
+    pagerEl.hidden = totalPages<=1;
+    cardsEl.innerHTML = pageRows.map(cardHtml).join('');
+
+    if(pagerEl.hidden) return;
+    document.getElementById('pg-label').textContent = 'Page '+state.page+' of '+totalPages;
+    document.getElementById('prev').disabled = state.page<=1;
+    document.getElementById('next').disabled = state.page>=totalPages;
+  }
+
+  document.getElementById('prev').addEventListener('click', function(){ if(state.page>1){state.page--; render(); window.scrollTo({top:document.querySelector('.controls').offsetTop-16, behavior:'smooth'});} });
+  document.getElementById('next').addEventListener('click', function(){ state.page++; render(); window.scrollTo({top:document.querySelector('.controls').offsetTop-16, behavior:'smooth'}); });
+
+  render();
+})();
+</script>
