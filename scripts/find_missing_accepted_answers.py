@@ -21,10 +21,29 @@ an idiom split across a sentence like "<strong>make a</strong> strange
 and the question is flagged only if none of them are close enough by cosine
 similarity.
 
+Embeddings alone don't reliably score inflected forms against the base form
+("said" vs. "to say", "land" vs. "landing"), so a lemma check runs first: each
+phrase is lemmatized token by token with lemminflect (leading "to" dropped),
+and a bolded gloss that shares a lemma sequence with any gloss is treated as
+covered without consulting the embeddings.
+
+Suru-nouns (JMdict `vs`, e.g. 記憶 "memory") are also used as verbs, so for
+them a single-word gloss also covers its derivational relatives from WordNet
+(nltk) that share a word stem: "memorize" for "memory". The wordnet corpus is
+downloaded on first run.
+
+A word's gloss pool is its `accepted_answers` plus the English glosses from
+the JMdict senses (`sense_glosses` in vocab.csv), which are far more numerous
+(e.g. 'mock' is a JMdict gloss of あざ笑う but not one of its accepted_answers).
+A gloss covered only by a sense gloss is not flagged: the flagged rows are the
+ones neither list covers. The output's `sense_glosses` column lists the sense
+glosses that are not already in accepted_answers, and `closest_gloss_source`
+says which list the closest match came from.
+
 Even at a well-tuned threshold, most remaining flags are genuine synonym
-gaps - translations reach for a natural English word (e.g. "mock") that the
-curated `accepted_answers` list simply never included (e.g. only "sneer
-at, ridicule"). This is a heuristic audit of `accepted_answers` coverage,
+gaps - translations reach for a natural English word that neither the curated
+`accepted_answers` nor the JMdict senses ever included. This is a heuristic
+audit of gloss coverage,
 not a list of translation errors, so results should be spot-checked (and
 often mean "add this gloss to accepted_answers") rather than treated as
 ground truth.
@@ -36,11 +55,19 @@ Output:
 """
 
 import csv
+import itertools
+import os
 import re
+from functools import lru_cache
 
+import nltk
 import numpy as np
 import torch
+from lemminflect import getAllLemmas
+from nltk.corpus import wordnet as wn
 from sentence_transformers import SentenceTransformer
+
+nltk.download("wordnet", quiet=True)  # no-op once cached in ~/nltk_data
 
 VOCAB_CSV = "data/vocab.csv"
 STUDY_QUESTIONS_CSV = "data/vocab_study_questions.csv"
@@ -57,6 +84,13 @@ MODEL_NAME = "BAAI/bge-large-en-v1.5"
 # 0.64) score below it.
 SIMILARITY_THRESHOLD = 0.75
 
+# Shortest shared prefix for two words to count as sharing a stem when
+# following WordNet derivational links (memory/memorize share "memor").
+MIN_SHARED_STEM = 4
+
+# Separator used inside vocab.csv's sense_glosses column (see vocab_json_to_csv.py).
+SENSE_GLOSS_SEP = " | "
+
 WS_RE = re.compile(r"\s+")
 STRONG_RE = re.compile(r"<strong>(.*?)</strong>", re.DOTALL)
 
@@ -69,12 +103,78 @@ def bold_phrases(translation: str) -> list[str]:
     return [normalize_phrase(m) for m in STRONG_RE.findall(translation) if normalize_phrase(m)]
 
 
+def strip_infinitive(phrase: str) -> str:
+    return phrase[3:] if phrase.startswith("to ") and len(phrase) > 3 else phrase
+
+
+@lru_cache(maxsize=None)
+def token_lemmas(token: str) -> tuple[str, ...]:
+    """The token plus every lemma lemminflect knows for it, across parts of
+    speech ("landing" -> landing, land; "said" -> said, say)."""
+    lemmas = {token}
+    for spellings in getAllLemmas(token).values():
+        lemmas.update(spellings)
+    return tuple(sorted(lemmas))
+
+
+def wordnet_relatives(word: str) -> set[str]:
+    """Single verbs WordNet lists as derivationally related to `word` that
+    also share a word stem with it (memory -> memorize, storage -> store).
+    The stem check drops WordNet's looser sense-level links (memory ->
+    remember/retain, training -> educate); the verb check drops agent nouns
+    and adjectives (guarantee -> guarantor, patience -> patient)."""
+    relatives = set()
+    for synset in wn.synsets(word):
+        for lemma in synset.lemmas():
+            for related in lemma.derivationally_related_forms():
+                name = related.name().lower()
+                if (
+                    related.synset().pos() == "v"
+                    and "_" not in name
+                    and len(os.path.commonprefix([word, name])) >= MIN_SHARED_STEM
+                ):
+                    relatives.add(name)
+    return relatives
+
+
+def derived_relatives(glosses: list[str]) -> set[str]:
+    """Lemmas derivationally related to any single-word gloss."""
+    relatives = set()
+    for gloss in glosses:
+        tokens = strip_infinitive(gloss).split()
+        if len(tokens) == 1:
+            for lemma in token_lemmas(tokens[0]):
+                relatives |= wordnet_relatives(lemma)
+    return relatives
+
+
+def lemma_keys(phrase: str) -> set[tuple[str, ...]]:
+    """Every way to lemmatize the phrase token by token, so two phrases that
+    differ only in inflection ("gave up" / "to give up", "landing" / "land")
+    share at least one key."""
+    tokens = strip_infinitive(phrase).split()
+    return set(itertools.product(*(token_lemmas(t) for t in tokens)))
+
+
 def load_vocab() -> dict[str, dict]:
     vocab = {}
     with open(VOCAB_CSV, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            glosses = [normalize_phrase(p) for p in row["accepted_answers"].split(",") if p.strip()]
-            vocab[row["id"]] = {"jlpt_level": row["jlpt_level"], "glosses": glosses}
+            accepted = [normalize_phrase(p) for p in row["accepted_answers"].split(",") if p.strip()]
+            senses = [normalize_phrase(p) for p in row["sense_glosses"].split(SENSE_GLOSS_SEP) if p.strip()]
+            # accepted_answers first so a tie on similarity reports the curated gloss.
+            glosses = list(dict.fromkeys(accepted + senses))
+            # A suru-noun (記憶 "memory") is also used as a verb ("memorize"),
+            # so a verb derived from one of its noun glosses counts as covered.
+            is_suru_noun = "vs" in row["jmdict_pos"].split(",")
+            vocab[row["id"]] = {
+                "jlpt_level": row["jlpt_level"],
+                "accepted": accepted,
+                "senses": senses,
+                "glosses": glosses,
+                "keys": set().union(*(lemma_keys(g) for g in glosses)),
+                "relatives": derived_relatives(glosses) if is_suru_noun else set(),
+            }
     return vocab
 
 
@@ -141,8 +241,10 @@ def main() -> None:
     fieldnames = [
         "vocab_id",
         "vocab_title",
+        "vocab_slug",
         "vocab_jlpt_level",
         "accepted_answers",
+        "sense_glosses",
         "study_question_id",
         "content",
         "answer",
@@ -151,6 +253,7 @@ def main() -> None:
         "translation",
         "missing_glosses",
         "closest_accepted_gloss",
+        "closest_gloss_source",
         "similarity",
     ]
     flagged = []
@@ -158,6 +261,18 @@ def main() -> None:
     for row in rows:
         v = vocab[row["vocab_id"]]
         if v["gloss_embs"] is None:
+            continue
+
+        # Same words as a known gloss up to inflection ("said" for "to say",
+        # "land" for "landing") is covered.
+        if any(lemma_keys(p) & v["keys"] for p in (row["candidate"], *row["bolds"])):
+            continue
+
+        # A suru-noun's verb form ("memorize" for 記憶 "memory") is covered.
+        if v["relatives"] and any(
+            len(tokens := strip_infinitive(p).split()) == 1 and v["relatives"].intersection(token_lemmas(tokens[0]))
+            for p in (row["candidate"], *row["bolds"])
+        ):
             continue
 
         best_sim, best_gloss = -1.0, ""
@@ -174,8 +289,10 @@ def main() -> None:
             {
                 "vocab_id": row["vocab_id"],
                 "vocab_title": row["vocab_title"],
+                "vocab_slug": row["vocab_slug"],
                 "vocab_jlpt_level": v["jlpt_level"],
-                "accepted_answers": ", ".join(v["glosses"]),
+                "accepted_answers": ", ".join(v["accepted"]),
+                "sense_glosses": SENSE_GLOSS_SEP.join(g for g in v["senses"] if g not in v["accepted"]),
                 "study_question_id": row["study_question_id"],
                 "content": row["content"],
                 "answer": row["answer"],
@@ -184,6 +301,7 @@ def main() -> None:
                 "translation": row["translation"],
                 "missing_glosses": "; ".join(row["bolds"]),
                 "closest_accepted_gloss": best_gloss,
+                "closest_gloss_source": "accepted_answers" if best_gloss in v["accepted"] else "sense",
                 "similarity": round(best_sim, 4),
             }
         )

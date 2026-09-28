@@ -13,6 +13,7 @@ Outputs:
 import json
 
 import pandas as pd
+from embed_payload import UNPACK_JS, minify_inline_scripts, pack
 
 VOCAB_CSV = "data/vocab.csv"
 NUANCE_SIMILARITY_CSV = "data/nuance_similarity.csv"
@@ -588,13 +589,14 @@ HTML_TEMPLATE = """<!doctype html>
   <p class="method" id="method"></p>
 </div>
 
-<script id="graph-data" type="application/json">__GRAPH_DATA__</script>
+<script id="graph-data" type="text/plain">__GRAPH_DATA__</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script>
-(function () {
+__UNPACK_JS__
+(async function () {
   "use strict";
 
-  var raw = JSON.parse(document.getElementById('graph-data').textContent);
+  var raw = JSON.parse(await unpack(document.getElementById('graph-data').textContent));
 
   var metricSelect = document.getElementById('metric');
   var levelSelect = document.getElementById('level');
@@ -1311,10 +1313,10 @@ def main() -> None:
         "metrics": build_metrics(nuance_df, accepted_df),
     }
 
-    payload = json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
-    payload = payload.replace("</script", "<\\/script")
+    payload = pack(json.dumps(raw, ensure_ascii=False, separators=(",", ":")))
 
-    html = HTML_TEMPLATE.replace("__GRAPH_DATA__", payload)
+    html = HTML_TEMPLATE.replace("__GRAPH_DATA__", payload).replace("__UNPACK_JS__", UNPACK_JS)
+    html = minify_inline_scripts(html)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(html)
 

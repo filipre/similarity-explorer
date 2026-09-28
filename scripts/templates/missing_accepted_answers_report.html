@@ -281,11 +281,15 @@ select#sort,.select-wrap select{
 .compare-word{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .compare-word .jp{font-family:var(--font-jp);font-size:19px;font-weight:600;color:var(--ink)}
 .compare-word .reading{font-family:var(--font-jp);font-size:13px;color:var(--muted)}
+.compare-word a.jp{text-decoration:none;border-bottom:1px dotted var(--line-strong)}
+.compare-word a.jp:hover,.compare-word a.jp:focus-visible{color:var(--accent-ink);border-bottom-color:var(--accent)}
 .level-tag{
   font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.02em;
   color:var(--muted);border:1px solid var(--line-strong);border-radius:4px;padding:1px 5px;
 }
 .gloss-list{font-size:12px;color:var(--ink-soft);margin-top:8px;max-height:60px;overflow:auto;line-height:1.6}
+.gloss-list.senses{margin-top:6px;color:var(--muted)}
+.gloss-list.senses b{font-weight:600;color:var(--ink-soft)}
 .missing-term{font-size:16px;font-weight:600;color:var(--accent-ink)}
 .compare-divider{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -340,7 +344,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   <div class="top-inner">
     <div class="eyebrow"><span class="dot"></span>similarity&#8209;explorer &middot; gloss coverage</div>
     <h1>Coverage <span class="stamp">Gaps</span></h1>
-    <p class="dek">Fill&#8209;in&#8209;the&#8209;blank questions whose translation bolds an English meaning that isn't listed in the tested word's own <code>accepted_answers</code> &mdash; found by comparing sentence&#8209;embedding similarity, not exact text, so inflected forms like &ldquo;recommended&rdquo; still match &ldquo;recommendation.&rdquo; Most rows below are genuine gaps worth adding, not translation errors.</p>
+    <p class="dek">Fill&#8209;in&#8209;the&#8209;blank questions whose translation bolds an English meaning that isn't listed in the tested word's own <code>accepted_answers</code> or its JMdict English sense glosses &mdash; found by comparing sentence&#8209;embedding similarity, not exact text, so inflected forms like &ldquo;recommended&rdquo; still match &ldquo;recommendation.&rdquo; Most rows below are genuine gaps worth adding, not translation errors.</p>
     <div class="stats">
       <div class="stat"><div class="n" id="stat-total">&mdash;</div><div class="l">flagged questions</div></div>
       <div class="stat"><div class="n" id="stat-vocab">&mdash;</div><div class="l">vocab entries affected</div></div>
@@ -403,17 +407,18 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   <div class="empty" id="empty" hidden>No flagged questions match that search.</div>
 
   <footer>
-    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_missing_accepted_answers.py</code>, using the same local sentence&#8209;embedding model (<code>BAAI/bge-large-en-v1.5</code>) this project already uses for vocab similarity &mdash; no network LLM calls. A row is flagged when no accepted_answers gloss reaches 0.75 cosine similarity with the question's bolded translation. &ldquo;Close call&rdquo; rows (0.65&ndash;0.75) sit right below that cutoff and are the most likely to be borderline calls rather than real gaps; everything else is a heuristic audit of gloss coverage, so still worth a human read.
+    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_missing_accepted_answers.py</code>, using the same local sentence&#8209;embedding model (<code>BAAI/bge-large-en-v1.5</code>) this project already uses for vocab similarity &mdash; no network LLM calls. A row is flagged when no gloss &mdash; from <code>accepted_answers</code> or the English glosses of the word's JMdict senses &mdash; reaches 0.75 cosine similarity with the question's bolded translation. &ldquo;Close call&rdquo; rows (0.65&ndash;0.75) sit right below that cutoff and are the most likely to be borderline calls rather than real gaps; everything else is a heuristic audit of gloss coverage, so still worth a human read.
   </footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="text/csv" id="csv-data">__CSV_DATA__</script>
+<script type="text/plain" id="csv-data">__CSV_DATA__</script>
 <script>
-(function(){
+__UNPACK_JS__
+(async function(){
   "use strict";
 
-  var raw = document.getElementById('csv-data').textContent;
+  var raw = await unpack(document.getElementById('csv-data').textContent);
   var parsed = Papa.parse(raw, {header:true, skipEmptyLines:true});
   var rows = parsed.data;
 
@@ -432,7 +437,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     r._sim = parseFloat(r.similarity) || 0;
     r._close = r._sim >= CLOSE_CALL_MIN;
     r._levelRank = levelRank(r.vocab_jlpt_level);
-    r._search = (r.vocab_title+' '+r.answer+' '+r.missing_glosses+' '+r.closest_accepted_gloss+' '+r.accepted_answers).toLowerCase();
+    r._search = (r.vocab_title+' '+r.answer+' '+r.missing_glosses+' '+r.closest_accepted_gloss+' '+r.accepted_answers+' '+r.sense_glosses).toLowerCase();
   });
 
   var vocabCount = new Set(rows.map(function(r){return r.vocab_id;})).size;
@@ -539,6 +544,10 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function bunproUrl(slug){
+    return 'https://bunpro.jp/vocabs/'+encodeURIComponent(slug);
+  }
+
   function renderContent(html){
     return html.replace(/____/g, '<span class="blank">____<\/span>');
   }
@@ -557,10 +566,11 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
         '<div class="compare">'+
           '<div class="compare-side accepted">'+
             '<span class="compare-tag">&#10003; accepted_answers<\/span>'+
-            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
+            '<div class="compare-word"><a class="jp" href="'+bunproUrl(r.vocab_slug)+'" target="_blank" rel="noopener" title="Open on Bunpro">'+escapeHtml(r.vocab_title)+'<\/a><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
             '<div class="gloss-list">'+escapeHtml(r.accepted_answers)+'<\/div>'+
+            (r.sense_glosses ? '<div class="gloss-list senses"><b>JMdict senses:<\/b> '+escapeHtml(r.sense_glosses.split(' | ').join(', '))+'<\/div>' : '')+
           '<\/div>'+
-          '<div class="compare-divider">closest match<b>&ldquo;'+escapeHtml(r.closest_accepted_gloss)+'&rdquo;<\/b>'+
+          '<div class="compare-divider">closest match'+(r.closest_gloss_source==='sense' ? ' (JMdict sense)' : '')+'<b>&ldquo;'+escapeHtml(r.closest_accepted_gloss)+'&rdquo;<\/b>'+
             '<div class="sim-gauge"><span class="fill" style="width:'+pct+'%"></span><span class="threshold"></span></div>'+
             '<span class="sim-value">'+r._sim.toFixed(2)+'<\/span>'+
           '<\/div>'+

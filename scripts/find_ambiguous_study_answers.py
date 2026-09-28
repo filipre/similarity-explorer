@@ -32,6 +32,13 @@ own curation agree. This is still a heuristic over English glosses, not a
 grammar or sentence-semantics check, so results should be spot-checked rather
 than treated as ground truth.
 
+Every flag is then checked against the sentence's grammatical slot using the
+JMdict part-of-speech in vocab.csv (see grammar_conflict): a suru-verb slot
+(`____する`), a na-adjective slot (`____な人`), or a transitive slot (`を____`)
+can't be filled by a candidate that's only a noun / i-adjective / intransitive
+verb. Such rows aren't dropped - the `grammar_conflict` column says why, so the
+report can hide them by default while keeping the rule auditable.
+
 Outputs:
   data/ambiguous_study_answers.csv, sorted with the highest-confidence flags
   first (dataset-confirmed, then smallest synonym cluster).
@@ -42,7 +49,6 @@ import re
 from collections import defaultdict
 
 VOCAB_CSV = "data/vocab.csv"
-VOCAB_POS_CSV = "data/vocab_pos.csv"
 STUDY_QUESTIONS_CSV = "data/vocab_study_questions.csv"
 OUTPUT_FILE = "data/ambiguous_study_answers.csv"
 
@@ -50,6 +56,9 @@ OUTPUT_FILE = "data/ambiguous_study_answers.csv"
 # Above this size the shared gloss is usually too generic (function words,
 # broad adverbs) to represent a genuine synonym pair.
 MAX_CLUSTER_SIZE = 6
+
+# Separator used inside vocab.csv's sense_glosses column (see vocab_json_to_csv.py).
+SENSE_GLOSS_SEP = " | "
 
 WS_RE = re.compile(r"\s+")
 STRONG_RE = re.compile(r"<strong>(.*?)</strong>", re.DOTALL)
@@ -89,16 +98,7 @@ def all_glosses(accepted_answers: str) -> set[str]:
     return {normalize_phrase(p) for p in accepted_answers.split(",") if p.strip()}
 
 
-def load_pos() -> dict[str, set[str]]:
-    pos = {}
-    with open(VOCAB_POS_CSV, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            pos[row["id"]] = {t.strip() for t in row["jmdict_pos"].split(",") if t.strip()}
-    return pos
-
-
 def load_vocab():
-    pos_by_id = load_pos()
     vocab = {}
     primary_to_ids = defaultdict(set)
     title_to_ids = defaultdict(set)
@@ -109,12 +109,16 @@ def load_vocab():
             primary = primary_gloss(row["accepted_answers"] or "")
             vocab[vid] = {
                 "title": row["title"],
+                "slug": row["slug"],
                 "kana": row["kana"],
                 "jlpt_level": row["jlpt_level"],
                 "accepted_answers": row["accepted_answers"],
-                "glosses": all_glosses(row["accepted_answers"] or ""),
+                # Sense glosses widen only the wrong_answers overlap check; the
+                # cluster path deliberately keys on the primary gloss alone.
+                "glosses": all_glosses(row["accepted_answers"] or "")
+                | {normalize_phrase(g) for g in (row["sense_glosses"] or "").split(SENSE_GLOSS_SEP) if g.strip()},
                 "primary": primary,
-                "pos": pos_by_id.get(vid, set()),
+                "pos": {t.strip() for t in row["jmdict_pos"].split(",") if t.strip()},
             }
             if primary:
                 primary_to_ids[primary].add(vid)
@@ -199,6 +203,101 @@ def wrong_answer_candidates(row, vid, vocab, title_to_ids, kana_to_ids, accepted
     return matches
 
 
+# ---- grammar check -------------------------------------------------------
+# Sharing an English gloss doesn't make a candidate a valid fill for the blank:
+# the sentence around it fixes the grammatical slot (`____する` needs a
+# suru-verb, `____な人` a na-adjective, `を____` a transitive verb, ...), and
+# a candidate whose JMdict POS can't fill that slot is a false positive. Rules
+# fire only on positive evidence from the words next to the blank and are
+# skipped when tested word and candidate share a grammatical class.
+
+FURIGANA_RE = re.compile(r"（[^）]*）")
+TAG_RE = re.compile(r"<[^>]+>")
+KANJI_KATAKANA_RE = re.compile(r"[一-鿿々ァ-ヺ]")
+
+SURU_POST_RE = re.compile(r"^(する|して|した|しま|しな|しよう|しろ|さ[れせ]|でき|いたし|致し|せず)")
+# Continuations that only follow a na-adjective/noun, never an i-adjective:
+# な+noun, に, だ (but not だろう), だっ(た), で (but not です), では, じゃ.
+NA_ONLY_POST_RE = re.compile(r"^(な(?![。！？!?」、,…])|に|だ(?!ろ)|だっ|で(?!す)|では|じゃ)")
+ATTRIBUTIVE_NA_RE = re.compile(r"^な[一-鿿々ァ-ヺ]")
+
+# Prenominal/expression entries take their own attributive forms, so a plain
+# adjective-type comparison doesn't apply to them.
+FREE_FORM_POS = {"adj-pn", "adj-f", "exp"}
+
+REASON_SURU = "sentence needs a suru-verb (blank followed by する) but candidate isn't one"
+REASON_NA_ATTRIBUTIVE = "sentence needs a na-adjective (blank followed by な + noun) but candidate isn't one"
+REASON_NA_VS_I = "sentence needs a na-adjective/noun form but candidate is an i-adjective"
+REASON_I_ADJ = "sentence needs an i-adjective (blank directly before a noun) but candidate needs な"
+REASON_VERB = "sentence needs a verb but candidate isn't one"
+REASON_TRANSITIVE = "blank follows を (transitive) but candidate is intransitive"
+REASON_INTRANSITIVE = "blank follows が (intransitive) but candidate is transitive-only"
+
+
+def slot_context(content: str) -> tuple[str, str]:
+    """(character before, text after) the `____` blank, with markup and furigana removed."""
+    text = FURIGANA_RE.sub("", TAG_RE.sub("", content))
+    i = text.find("____")
+    if i == -1:
+        return "", ""
+    return text[i - 1 : i], text[i + 4 : i + 10]
+
+
+def is_verb(pos: set[str]) -> bool:
+    return any(p.startswith(("v1", "v2", "v4", "v5", "vk", "vz", "vr", "vn")) for p in pos)
+
+
+def is_suru(pos: set[str]) -> bool:
+    return any(p.startswith("vs") for p in pos)
+
+
+def grammar_classes(pos: set[str]) -> set[str]:
+    """Coarse grammatical classes; a shared class means the two words can fill the same kind of slot."""
+    classes = set()
+    for p in pos:
+        if p.startswith(("v1", "v2", "v4", "v5")) or p in {"vk", "vz", "vr", "vn", "aux-v"}:
+            classes.add("verb")
+        elif p.startswith("vs"):
+            classes.add("suru")
+        elif p in {"adj-i", "adj-ix", "aux-adj"}:
+            classes.add("i-adj")
+        elif p not in {"vt", "vi"}:
+            classes.add(p)
+    return classes
+
+
+def grammar_conflict(content: str, tested: set[str], cand: set[str]) -> str:
+    """Why `cand` can't grammatically fill the blank meant for `tested`, or "" if it can."""
+    before, after = slot_context(content)
+    shared = grammar_classes(tested) & grammar_classes(cand)
+
+    if is_suru(tested) and SURU_POST_RE.match(after) and not is_suru(cand):
+        return REASON_SURU
+
+    if "adj-na" in tested and "adj-na" not in cand and not cand & FREE_FORM_POS:
+        if ATTRIBUTIVE_NA_RE.match(after):
+            return REASON_NA_ATTRIBUTIVE
+        if "adj-i" in cand and "n" not in cand and NA_ONLY_POST_RE.match(after):
+            return REASON_NA_VS_I
+
+    pure_i_adj = "adj-i" in tested and not tested & {"adj-na", "n"}
+    if pure_i_adj and not shared and not cand & FREE_FORM_POS and KANJI_KATAKANA_RE.match(after):
+        return REASON_I_ADJ
+
+    if is_verb(tested) and not shared and not is_verb(cand) and not is_suru(cand):
+        return REASON_VERB
+
+    if is_verb(tested) and is_verb(cand):
+        # JMdict leaves vt/vi off verbs whose transitivity it doesn't record, so
+        # only a candidate positively tagged as the opposite counts as a conflict.
+        if before == "を" and "vt" in tested and "vi" in cand and "vt" not in cand:
+            return REASON_TRANSITIVE
+        if before == "が" and "vi" in tested and "vt" not in tested and "vt" in cand and "vi" not in cand:
+            return REASON_INTRANSITIVE
+
+    return ""
+
+
 def main() -> None:
     vocab, clusters, title_to_ids, kana_to_ids = load_vocab()
 
@@ -208,6 +307,7 @@ def main() -> None:
         "study_question_id",
         "vocab_id",
         "vocab_title",
+        "vocab_slug",
         "vocab_jlpt_level",
         "content",
         "answer",
@@ -218,9 +318,11 @@ def main() -> None:
         "shared_meaning",
         "candidate_vocab_id",
         "candidate_title",
+        "candidate_slug",
         "candidate_kana",
         "candidate_jlpt_level",
         "candidate_accepted_answers",
+        "grammar_conflict",
     ]
     flagged = []
 
@@ -250,6 +352,7 @@ def main() -> None:
                         "study_question_id": row["study_question_id"],
                         "vocab_id": vid,
                         "vocab_title": row["vocab_title"],
+                        "vocab_slug": v["slug"],
                         "vocab_jlpt_level": v["jlpt_level"],
                         "content": row["content"],
                         "answer": row["answer"],
@@ -260,9 +363,11 @@ def main() -> None:
                         "shared_meaning": from_cluster.get(cid) or from_wrong.get(cid),
                         "candidate_vocab_id": cid,
                         "candidate_title": cand["title"],
+                        "candidate_slug": cand["slug"],
                         "candidate_kana": cand["kana"],
                         "candidate_jlpt_level": cand["jlpt_level"],
                         "candidate_accepted_answers": cand["accepted_answers"],
+                        "grammar_conflict": grammar_conflict(row["content"], v["pos"], cand["pos"]),
                     }
                 )
 
@@ -280,6 +385,13 @@ def main() -> None:
         by_source[r["source"]] += 1
     print(f"Wrote {len(flagged)} ambiguous answer flags across {n_questions} study questions to {OUTPUT_FILE}")
     print(f"By source: {dict(by_source)}")
+    by_conflict = defaultdict(int)
+    for r in flagged:
+        if r["grammar_conflict"]:
+            by_conflict[r["grammar_conflict"]] += 1
+    print(f"Grammar conflicts: {sum(by_conflict.values())} of {len(flagged)} flags")
+    for reason, n in sorted(by_conflict.items(), key=lambda kv: -kv[1]):
+        print(f"  {n:5d}  {reason}")
 
 
 if __name__ == "__main__":

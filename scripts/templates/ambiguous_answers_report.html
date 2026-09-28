@@ -288,6 +288,8 @@ select#sort,.select-wrap select{
 .compare-side.rejected .compare-tag{color:var(--accent-ink)}
 .compare-word{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .compare-word .jp{font-family:var(--font-jp);font-size:19px;font-weight:600;color:var(--ink)}
+.compare-word a.jp{text-decoration:none;border-bottom:1px dotted var(--line-strong)}
+.compare-word a.jp:hover,.compare-word a.jp:focus-visible{color:var(--accent-ink);border-bottom-color:var(--accent)}
 .compare-word .reading{font-family:var(--font-jp);font-size:13px;color:var(--muted)}
 .level-tag{
   font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.02em;
@@ -318,6 +320,12 @@ select#sort,.select-wrap select{
   margin-top:10px;font-size:12px;color:var(--amber-ink);
   background:var(--amber-soft);display:inline-block;padding:4px 10px;border-radius:6px;
 }
+
+.grammar-note{
+  margin-top:10px;font-size:12px;color:var(--amber-ink);
+  background:var(--amber-soft);display:inline-block;padding:4px 10px;border-radius:6px;
+}
+.chip.conflict{background:var(--amber-soft);color:var(--amber-ink)}
 
 .empty{
   text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;
@@ -351,6 +359,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
       <div class="stat"><div class="n" id="stat-total">&mdash;</div><div class="l">flagged answer pairs</div></div>
       <div class="stat"><div class="n" id="stat-questions">&mdash;</div><div class="l">questions affected</div></div>
       <div class="stat"><div class="n accent" id="stat-confirmed">&mdash;</div><div class="l">confirmed by the dataset's own wrong&#8209;answer list</div></div>
+      <div class="stat"><div class="n" id="stat-conflict">&mdash;</div><div class="l">hidden as grammatical mismatches (noun vs. verb, na&#8209; vs. i&#8209;adjective, &hellip;)</div></div>
     </div>
   </div>
 </header>
@@ -381,6 +390,11 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
       <button data-v="confirmed">Confirmed</button>
       <button data-v="cluster">Heuristic only</button>
     </div>
+    <div class="seg" id="seg-grammar" role="group" aria-label="Filter by grammar check">
+      <button data-v="plausible" class="active">Plausible</button>
+      <button data-v="conflict">Grammar conflict</button>
+      <button data-v="all">All</button>
+    </div>
     <div class="select-wrap">
       <label for="level">Level</label>
       <select id="level">
@@ -408,17 +422,18 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   <div class="empty" id="empty" hidden>No flagged questions match that search.</div>
 
   <footer>
-    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_ambiguous_study_answers.py</code>. A flag means the candidate word's primary English gloss overlaps the question's bolded translation cue and its kana/kanji aren't present in that question's accepted answers &mdash; a heuristic over glosses, not a grammar check, so borderline cases are worth a human read. &ldquo;Confirmed&rdquo; rows additionally appear in that question's own <code>wrong_answers</code> field.
+    Generated from <code>vocab.csv</code> &times; <code>vocab_study_questions.csv</code> by <code>scripts/find_ambiguous_study_answers.py</code>. A flag means the candidate word's primary English gloss overlaps the question's bolded translation cue and its kana/kanji aren't present in that question's accepted answers &mdash; a heuristic over glosses, so borderline cases are worth a human read. Each flag is then checked against the sentence&rsquo;s grammatical slot using the JMdict part of speech in <code>vocab.csv</code> (a blank before <code>&#12377;&#12427;</code> needs a suru&#8209;verb, before <code>&#12394;</code>+noun a na&#8209;adjective, after <code>&#12434;</code> a transitive verb, &hellip;); candidates that can&rsquo;t fill that slot are hidden by default and shown under &ldquo;Grammar conflict&rdquo; with the reason. The check is rule&#8209;based and only fires on clear evidence, so it catches a small share of false positives, not all of them. &ldquo;Confirmed&rdquo; rows additionally appear in that question's own <code>wrong_answers</code> field.
   </footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="text/csv" id="csv-data">__CSV_DATA__</script>
+<script type="text/plain" id="csv-data">__CSV_DATA__</script>
 <script>
-(function(){
+__UNPACK_JS__
+(async function(){
   "use strict";
 
-  var raw = document.getElementById('csv-data').textContent;
+  var raw = await unpack(document.getElementById('csv-data').textContent);
   var parsed = Papa.parse(raw, {header:true, skipEmptyLines:true});
   var rows = parsed.data;
 
@@ -440,6 +455,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     r._id = i;
     r._tier = TIER[r.source] || TIER.cluster;
     r._confirmed = r.source !== 'cluster';
+    r._conflict = !!r.grammar_conflict;
     // A question is only "within" a level range if BOTH the tested word and the
     // candidate synonym are - the harder of the two gates it, same rule
     // generate_similarity_explorer.py applies to an edge's two endpoints.
@@ -447,9 +463,13 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     r._search = (r.vocab_title+' '+r.answer+' '+r.candidate_title+' '+r.candidate_kana+' '+r.shared_meaning).toLowerCase();
   });
 
-  var totalQuestions = new Set(rows.map(function(r){return r.study_question_id;})).size;
-  var confirmedCount = rows.filter(function(r){return r._confirmed;}).length;
-  document.getElementById('stat-total').textContent = rows.length.toLocaleString();
+  // Headline stats and charts describe the rows shown by default - the ones that
+  // passed the grammar check; the "Grammar conflict" rows are opt-in.
+  var plausible = rows.filter(function(r){return !r._conflict;});
+  var totalQuestions = new Set(plausible.map(function(r){return r.study_question_id;})).size;
+  var confirmedCount = plausible.filter(function(r){return r._confirmed;}).length;
+  document.getElementById('stat-total').textContent = plausible.length.toLocaleString();
+  document.getElementById('stat-conflict').textContent = (rows.length-plausible.length).toLocaleString();
   document.getElementById('stat-questions').textContent = totalQuestions.toLocaleString();
   document.getElementById('stat-confirmed').textContent = confirmedCount.toLocaleString();
 
@@ -457,7 +477,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   var sourceOrder = ['cluster+wrong_answers','wrong_answers','cluster'];
   var sourceCounts = {};
   sourceOrder.forEach(function(s){sourceCounts[s]=0;});
-  rows.forEach(function(r){ sourceCounts[r.source] = (sourceCounts[r.source]||0)+1; });
+  plausible.forEach(function(r){ sourceCounts[r.source] = (sourceCounts[r.source]||0)+1; });
   var maxSource = Math.max.apply(null, sourceOrder.map(function(s){return sourceCounts[s];}));
   var sourceColor = {'cluster+wrong_answers':'var(--accent)','wrong_answers':'var(--accent-ink)','cluster':'var(--muted)'};
   var sourceLabel = {'cluster+wrong_answers':'Both signals','wrong_answers':'Dataset‑listed','cluster':'Heuristic only'};
@@ -480,7 +500,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
 
   // ---- chart: cluster size distribution (cluster-sourced rows only) ----
   var clusterCounts = {};
-  rows.forEach(function(r){
+  plausible.forEach(function(r){
     if(r.cluster_size){ clusterCounts[r.cluster_size] = (clusterCounts[r.cluster_size]||0)+1; }
   });
   var clusterSizes = Object.keys(clusterCounts).sort(function(a,b){return a-b;});
@@ -499,7 +519,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
 
   // ---- chart: top contested glosses ----
   var meaningCounts = {};
-  rows.forEach(function(r){ meaningCounts[r.shared_meaning] = (meaningCounts[r.shared_meaning]||0)+1; });
+  plausible.forEach(function(r){ meaningCounts[r.shared_meaning] = (meaningCounts[r.shared_meaning]||0)+1; });
   var topMeanings = Object.keys(meaningCounts).sort(function(a,b){return meaningCounts[b]-meaningCounts[a];}).slice(0,8);
   var maxMeaning = meaningCounts[topMeanings[0]] || 1;
   var chartMeaningEl = document.getElementById('chart-meanings');
@@ -515,7 +535,7 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   });
 
   // ---- filter / sort / paginate ----
-  var state = {q:'', source:'all', level:LEVEL_ORDER.length, sort:'default', page:1};
+  var state = {q:'', source:'all', grammar:'plausible', level:LEVEL_ORDER.length, sort:'default', page:1};
   var PAGE_SIZE = 24;
 
   document.getElementById('level').addEventListener('change', function(e){
@@ -533,6 +553,18 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
   document.querySelectorAll('#seg-source button').forEach(function(b){
     b.addEventListener('click', function(){ setSourceFilter(b.dataset.v); });
   });
+
+  function setGrammarFilter(v){
+    state.grammar = v; state.page = 1;
+    document.querySelectorAll('#seg-grammar button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.v===v);
+    });
+    render();
+  }
+
+  document.querySelectorAll('#seg-grammar button').forEach(function(b){
+    b.addEventListener('click', function(){ setGrammarFilter(b.dataset.v); });
+  });
   document.getElementById('sort').addEventListener('change', function(e){
     state.sort = e.target.value; state.page = 1; render();
   });
@@ -545,6 +577,10 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
 
   function escapeHtml(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function bunproUrl(slug){
+    return 'https://bunpro.jp/vocabs/'+encodeURIComponent(slug);
   }
 
   function renderContent(html){
@@ -567,6 +603,10 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     if(otherForms.length){
       altNote = '<div class="compare-alts">also accepts: '+escapeHtml(otherForms.join('; '))+'</div>';
     }
+    var grammarNote = '';
+    if(r.grammar_conflict){
+      grammarNote = '<div class="grammar-note">&#9888; grammar check: '+escapeHtml(r.grammar_conflict)+'</div>';
+    }
     var wrongNote = '';
     if(r.wrong_answers){
       wrongNote = '<div class="wrong-note">&#9873; this question already lists <span style="font-family:var(--font-jp)">'+escapeHtml(r.wrong_answers)+'</span> as a wrong answer</div>';
@@ -581,17 +621,18 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
         '<div class="compare">'+
           '<div class="compare-side accepted">'+
             '<span class="compare-tag">&#10003; Accepted<\/span>'+
-            '<div class="compare-word"><span class="jp">'+escapeHtml(r.vocab_title)+'<\/span><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
+            '<div class="compare-word"><a class="jp" href="'+bunproUrl(r.vocab_slug)+'" target="_blank" rel="noopener" title="Open on Bunpro">'+escapeHtml(r.vocab_title)+'<\/a><span class="reading">'+escapeHtml(r.answer)+'<\/span><span class="level-tag">'+escapeHtml(r.vocab_jlpt_level)+'<\/span><\/div>'+
             altNote+
           '<\/div>'+
           '<div class="compare-divider">both mean<b>&ldquo;'+escapeHtml(r.shared_meaning)+'&rdquo;<\/b><\/div>'+
           '<div class="compare-side rejected">'+
             '<span class="compare-tag">&#10007; Not accepted<\/span>'+
-            '<div class="compare-word"><span class="jp">'+escapeHtml(r.candidate_title)+'<\/span><span class="reading">'+escapeHtml(r.candidate_kana)+'<\/span><span class="level-tag">'+escapeHtml(r.candidate_jlpt_level)+'<\/span><\/div>'+
+            '<div class="compare-word"><a class="jp" href="'+bunproUrl(r.candidate_slug)+'" target="_blank" rel="noopener" title="Open on Bunpro">'+escapeHtml(r.candidate_title)+'<\/a><span class="reading">'+escapeHtml(r.candidate_kana)+'<\/span><span class="level-tag">'+escapeHtml(r.candidate_jlpt_level)+'<\/span><\/div>'+
           '<\/div>'+
         '<\/div>'+
         '<div class="translation">'+r.translation+'<\/div>'+
         wrongNote+
+        grammarNote+
       '<\/div>'
     );
   }
@@ -601,6 +642,8 @@ footer code{font-family:var(--font-mono);background:var(--surface-2);padding:1px
     var filtered = rows.filter(function(r){
       if(state.source==='confirmed' && !r._confirmed) return false;
       if(state.source==='cluster' && r._confirmed) return false;
+      if(state.grammar==='plausible' && r._conflict) return false;
+      if(state.grammar==='conflict' && !r._conflict) return false;
       if(r._levelRank >= state.level) return false;
       if(q && r._search.indexOf(q)===-1) return false;
       return true;

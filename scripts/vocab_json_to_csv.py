@@ -27,8 +27,15 @@ FIXED_FIELDS = [
     "male_audio_url",
     "meaning",
     "accepted_answers",
+    "sense_glosses",
+    "jmdict_pos",
+    "word_types",
     "nuance_translation",
 ]
+
+# Separator for sense_glosses; JMdict glosses routinely contain commas (and
+# occasionally semicolons), so neither works as a delimiter, and none contain "|".
+SENSE_GLOSS_SEP = " | "
 
 
 def load_kanji_levels() -> dict[str, int]:
@@ -52,6 +59,95 @@ def wanikani_info(title: str, kanji_levels: dict[str, int]) -> tuple[int, str]:
     return required_level, "".join(unknown_kanji)
 
 
+# JMdict part-of-speech code -> readable word types. Exact codes first; the
+# verb families (v1, v5r, vk, v2h-k, v4r, ...) are matched by prefix below.
+POS_TO_TYPES = {
+    "n": ["noun"],
+    "n-suf": ["noun", "suffix"],
+    "n-pref": ["noun", "prefix"],
+    "pn": ["pronoun"],
+    "num": ["numeral"],
+    "ctr": ["counter"],
+    "vt": ["transitive"],
+    "vi": ["intransitive"],
+    "vs": ["verb", "suru verb"],
+    "vs-s": ["verb", "suru verb"],
+    "vs-i": ["verb", "suru verb"],
+    "vs-c": ["verb", "suru verb"],
+    "vk": ["verb"],
+    "vz": ["verb"],
+    "vr": ["verb"],
+    "vn": ["verb"],
+    "adj-i": ["i-adjective"],
+    "adj-ix": ["i-adjective"],
+    "adj-na": ["na-adjective"],
+    "adj-no": ["no-adjective"],
+    "adj-pn": ["prenominal adjective"],
+    "adj-f": ["prenominal"],
+    "adj-t": ["taru-adjective"],
+    "adj-ku": ["ku-adjective"],
+    "adv": ["adverb"],
+    "adv-to": ["adverb"],
+    "conj": ["conjunction"],
+    "int": ["interjection"],
+    "prt": ["particle"],
+    "aux": ["auxiliary"],
+    "aux-v": ["auxiliary", "verb"],
+    "aux-adj": ["auxiliary", "adjective"],
+    "pref": ["prefix"],
+    "suf": ["suffix"],
+    "exp": ["expression"],
+    "unc": ["unclassified"],
+}
+VERB_PREFIXES = ("v1", "v2", "v4", "v5")
+
+
+def pos_codes(reviewable: dict) -> list[str]:
+    """JMdict POS codes for the word.
+
+    Bunpro's own jmdict_pos is used as-is when present; a few entries (e.g.
+    カフェ) have it empty even though their JMdict senses are tagged, so fall
+    back to the codes on the senses that carry an English gloss.
+    """
+    codes = list(reviewable.get("jmdict_pos") or [])
+    if not codes:
+        for sense in (reviewable.get("jmdict_data") or {}).get("sense", []):
+            if any(g.get("lang") == "eng" for g in sense.get("gloss", [])):
+                codes += sense.get("partOfSpeech", [])
+    return list(dict.fromkeys(codes))
+
+
+def word_types(codes: list[str]) -> list[str]:
+    """Readable, de-duplicated word types for JMdict POS codes, in code order."""
+    types: dict[str, None] = {}
+    for code in codes:
+        if code in POS_TO_TYPES:
+            found = POS_TO_TYPES[code]
+        elif code.startswith(VERB_PREFIXES):
+            found = ["verb"]
+        else:
+            found = [f"unclassified ({code})"]  # keep unknown codes visible
+        types.update(dict.fromkeys(found))
+    return list(types)
+
+
+def english_sense_glosses(reviewable: dict) -> str:
+    """Every English gloss across the JMdict senses, de-duped, in source order.
+
+    jmdict_data.sense[].gloss[] mixes glosses in many languages (dut, ger,
+    hun, fre, ...); only the English ones describe the word's meaning in the
+    terms the study questions use. This is a much wider net than
+    accepted_answers, which is a short hand-curated subset of these.
+    """
+    glosses = {}
+    for sense in (reviewable.get("jmdict_data") or {}).get("sense", []):
+        for gloss in sense.get("gloss", []):
+            text = (gloss.get("text") or "").strip()
+            if gloss.get("lang") == "eng" and text:
+                glosses[text] = None
+    return SENSE_GLOSS_SEP.join(glosses)
+
+
 def main() -> None:
     files = sorted(INPUT_DIR.glob("*.json"))
     kanji_levels = load_kanji_levels()
@@ -69,6 +165,11 @@ def main() -> None:
         reviewable["wanikani_level"], reviewable["wanikani_unknown_kanji"] = (
             wanikani_info(reviewable["title"], kanji_levels)
         )
+
+        reviewable["sense_glosses"] = english_sense_glosses(reviewable)
+        codes = pos_codes(reviewable)
+        reviewable["jmdict_pos"] = ",".join(codes)
+        reviewable["word_types"] = ",".join(word_types(codes))
 
         rows.append(reviewable)
 
