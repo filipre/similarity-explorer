@@ -59,7 +59,6 @@ def build_nodes(vocab: pd.DataFrame) -> list[dict]:
                 "title": row.title,
                 "kana": row.kana,
                 "meaning": row.meaning,
-                "nuance": row.nuance_translation,
                 "jlpt": row.jlpt_level,
                 "accepted": format_accepted(row.accepted_answers),
             }
@@ -408,7 +407,6 @@ HTML_TEMPLATE = """<!doctype html>
   .tooltip .t-title { font-size: 15px; font-weight: 700; }
   .tooltip .t-kana { font-size: 11.5px; font-weight: 400; color: var(--ink-muted); }
   .tooltip .t-meaning { color: var(--ink-secondary); margin-top: 2px; }
-  .tooltip .t-nuance { color: var(--ink-secondary); margin-top: 6px; font-size: 11.5px; }
   .tooltip .t-accepted { color: var(--ink-secondary); margin-top: 6px; font-size: 11px; }
   .tooltip .t-degree { margin-top: 6px; font-size: 11px; color: var(--ink-muted); }
   .tooltip .t-neighbors { margin-top: 8px; border-top: 1px solid var(--hairline); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
@@ -1116,12 +1114,11 @@ __UNPACK_JS__
       title.appendChild(kana);
     }
     var meaning = document.createElement('div'); meaning.className = 't-meaning'; meaning.textContent = n.meaning;
-    var nuance = document.createElement('div'); nuance.className = 't-nuance'; nuance.textContent = n.nuance;
     var accepted = document.createElement('div'); accepted.className = 't-accepted'; accepted.textContent = 'Accepted: ' + n.accepted;
     var degree = document.createElement('div'); degree.className = 't-degree';
     var deg = visibleDegree.get(n.id) || 0;
     degree.textContent = 'Confusable with ' + deg + ' word' + (deg === 1 ? '' : 's') + ' at this threshold';
-    tooltip.appendChild(title); tooltip.appendChild(meaning); tooltip.appendChild(nuance);
+    tooltip.appendChild(title); tooltip.appendChild(meaning);
     tooltip.appendChild(accepted); tooltip.appendChild(degree);
 
     var top5 = adjacency.get(n.id).slice(0, 5);
@@ -1302,7 +1299,7 @@ __UNPACK_JS__
 
 def main() -> None:
     vocab = pd.read_csv(VOCAB_CSV)
-    text_cols = ["title", "kana", "meaning", "nuance_translation", "jlpt_level", "accepted_answers"]
+    text_cols = ["title", "kana", "meaning", "jlpt_level", "accepted_answers"]
     vocab[text_cols] = vocab[text_cols].fillna("")
 
     nuance_df = pd.read_csv(NUANCE_SIMILARITY_CSV)
